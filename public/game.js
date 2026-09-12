@@ -386,3 +386,311 @@ function updateBottomPanel() {
         });
     }
 }
+Вы правы, я нарушил порядок функций. Вот итоговый код в правильной последовательности: от обработчиков кликов и событий к функциям UI (включая updateTopBar), затем логика расстановки (autoSetup и остальные).
+
+function cellFromEvent(e) {
+  const r = canvas.getBoundingClientRect();
+  let cx, cy;
+  if (e.touches && e.touches[0]) {
+    cx = e.touches[0].clientX - r.left;
+    cy = e.touches[0].clientY - r.top;
+  } else if (e.changedTouches && e.changedTouches[0]) {
+    cx = e.changedTouches[0].clientX - r.left;
+    cy = e.changedTouches[0].clientY - r.top;
+  } else {
+    cx = e.clientX - r.left;
+    cy = e.clientY - r.top;
+  }
+  return { x: Math.floor(cx / CELL), y: Math.floor(cy / CELL) };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (!state || state.phase !== 'battle') return;
+  dragStart = cellFromEvent(e);
+  dragEnd = null;
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (dragStart) { dragEnd = cellFromEvent(e); render(); }
+});
+canvas.addEventListener('mouseup', (e) => handlePointerUp(e));
+
+canvas.addEventListener('touchstart', (e) => {
+  if (!state || state.phase !== 'battle') return;
+  dragStart = cellFromEvent(e);
+  dragEnd = null;
+}, { passive: true });
+canvas.addEventListener('touchmove', (e) => {
+  if (dragStart) { dragEnd = cellFromEvent(e); render(); }
+}, { passive: true });
+canvas.addEventListener('touchend', (e) => handlePointerUp(e), { passive: true });
+
+function handlePointerUp(e) {
+  const c = cellFromEvent(e);
+  const isDrag = dragStart && (Math.abs(c.x - dragStart.x) > 1 || Math.abs(c.y - dragStart.y) > 1);
+  if (isDrag && state && state.phase === 'battle') {
+    const x1 = Math.min(dragStart.x, c.x), y1 = Math.min(dragStart.y, c.y);
+    const x2 = Math.max(dragStart.x, c.x), y2 = Math.max(dragStart.y, c.y);
+    const inRect = state.units.filter(u =>
+      u.owner === myRole && !u.acted &&
+      u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2
+    );
+    const multi = !!(e.ctrlKey || e.shiftKey);
+    if (!multi) selected.clear();
+    inRect.forEach(u => selected.add(u.id));
+    dragStart = dragEnd = null;
+    render();
+    return;
+  }
+  dragStart = dragEnd = null;
+  handleClick(c, !!(e.ctrlKey || e.shiftKey));
+}
+
+function handleClick(c, multi) {
+  if (!state) return;
+
+  if (state.phase === 'setup') {
+    const isDef = myRole === 'defender';
+    const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
+    const need = isDef ? spec.defender : spec.attacker;
+    const zone = isDef ? [0, 6] : [13, SIZE - 1];
+    if (c.y < zone[0] || c.y > zone[1]) return;
+    if (setupUnits.length >= need) return;
+    const cell = MAP[c.y] && MAP[c.y][c.x];
+    if (!cell || cell.terrain === 'unknown') return;
+    if (cell.terrain === 'river' && !cell.bridge) return;
+    const idx = setupUnits.findIndex(u => u.x === c.x && u.y === c.y);
+    if (idx >= 0) { setupUnits.splice(idx, 1); render(); return; }
+    setupUnits.push({ x: c.x, y: c.y });
+    render();
+    return;
+  }
+
+  if (state.phase !== 'battle' || state.turn !== myRole) return;
+
+  const clicked = state.units.find(u => u.x === c.x && u.y === c.y);
+
+  if (clicked && clicked.owner === myRole) {
+    if (multi) {
+      if (selected.has(clicked.id)) selected.delete(clicked.id);
+      else selected.add(clicked.id);
+    } else {
+      if (selected.size === 1 && selected.has(clicked.id)) {
+        // оставляем выделенным
+      } else {
+        selected.clear();
+        selected.add(clicked.id);
+      }
+    }
+    pendingShotCell = null;
+    blindMode = false;
+    render();
+    return;
+  }
+
+  if (selected.size === 1) { 
+    const u = state.units.find(x => selected.has(x.id)); 
+    if (!u || u.acted) return;
+    
+    if (blindMode) {
+      const shots = getShotCells(u);
+      if (shots.some(s => s.x === c.x && s.y === c.y)) {
+        ws.send(JSON.stringify({ type: 'action', action: 'shootAt', id: u.id, x: c.x, y: c.y }));
+        blindMode = false;
+        selected.delete(u.id);
+      }
+      return;
+    }
+
+    if (clicked && clicked.owner !== myRole) {
+      if (pendingShotCell && pendingShotCell.x === c.x && pendingShotCell.y === c.y) {
+        ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
+        pendingShotCell = null;
+        selected.delete(u.id);
+        render();
+        return;
+      }
+      pendingShotCell = { x: c.x, y: c.y };
+      render();
+      return;
+    }
+
+    const moves = getMoveCells(u); 
+    if (moves.some(m => m.x === c.x && m.y === c.y)) { 
+      const dx = c.x - u.x, dy = c.y - u.y; 
+      ws.send(JSON.stringify({ type: 'action', action: 'move', id: u.id, dx, dy })); 
+      selected.delete(u.id); 
+      render(); 
+      return; 
+    }
+    selected.clear();
+    pendingShotCell = null;
+    render();
+    return;
+  }
+  
+  if (selected.size > 0) { 
+    selected.clear(); 
+    pendingShotCell = null; 
+    render(); 
+  } 
+}
+
+function updateTopBar() { 
+  const dot = document.getElementById('turnDot'); 
+  const info = document.getElementById('turnInfo'); 
+  if (!state) return; 
+  if (state.phase === 'setup') { 
+    dot.className = myRole === 'defender' ? 'blue' : 'red'; 
+    info.textContent = 'Расстановка: ' + (myRole === 'defender' ? 'Защитник' : 'Атакующий'); 
+  } else if (state.phase === 'battle') { 
+    dot.className = state.turn === 'defender' ? 'blue' : 'red'; 
+    info.textContent = 'Ход ' + (state.turn === 'defender' ? 'защитника' : 'атакующего'); 
+  } else if (state.phase === 'over') { 
+    dot.className = state.winner === 'defender' ? 'blue' : 'red'; 
+    info.textContent = state.winner === myRole ? '🏆 Победа!' : '💀 Поражение'; 
+  } 
+}
+
+function updateBottomPanel() { 
+  const stats = document.getElementById('stats'); 
+  const actions = document.getElementById('actionRow'); 
+  const dirs = document.getElementById('dirRow'); 
+  actions.innerHTML = ''; 
+  dirs.innerHTML = ''; 
+  if (!state) return;
+
+  if (state.phase === 'setup') { 
+    const isDef = myRole === 'defender'; 
+    const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 }; 
+    const need = isDef ? spec.defender : spec.attacker; 
+    stats.textContent = 'Поставлено: ' + setupUnits.length + '/' + need + ' бойцов'; 
+    addBtn(actions, '🎲 Авто-расстановка', autoSetup); 
+    addBtn(actions, 'Очистить', () => { setupUnits = []; render(); }); 
+    const ready = setupUnits.length === need; 
+    const b = addBtn(actions, '✅ Готов', commitSetup, 'primary'); 
+    b.disabled = !ready; 
+    return; 
+  }
+
+  if (state.phase === 'battle') { 
+    const mine = state.units.filter(u => u.owner === myRole); 
+    const notMoved = mine.filter(u => !u.acted).length; 
+    stats.textContent = 'Моих бойцов: ' + mine.length + ' · Ещё не сходили: ' + notMoved + ' · Всего на поле: ' + state.units.length;
+
+    if (state.turn !== myRole) {
+      const b = addBtn(actions, '⏳ Ожидание соперника', null);
+      b.disabled = true;
+      return;
+    }
+
+    addBtn(actions, '👥 Выделить всех не ходивших', () => {
+      selected.clear();
+      mine.forEach(u => { if (!u.acted) selected.add(u.id); });
+      render();
+    });
+    addBtn(actions, '✖ Снять выделение', () => { selected.clear(); pendingShotCell = null; blindMode = false; render(); });
+
+    const lbl = document.createElement('div');
+    lbl.style.width = '100%';
+    lbl.style.fontSize = '12px';
+    lbl.style.color = '#aaa';
+    lbl.textContent = 'Повернуть:';
+    dirs.appendChild(lbl);
+    ['↖','↑','↗','→','↘','↓','↙','←'].forEach(s => {
+      const mapD = { '↑':0, '↗':1, '→':2, '↘':3, '↓':4, '↙':5, '←':6, '↖':7 };
+      addBtn(dirs, s, () => rotateSelected(mapD[s]), 'arrowBtn');
+    });
+
+    if (selected.size === 1) {
+      addBtn(actions, blindMode ? '🎯 Клик по клетке…' : '🎯 Выстрел вслепую', () => {
+        blindMode = !blindMode;
+        pendingShotCell = null;
+        render();
+      }, blindMode ? 'primary' : '');
+    }
+
+    addBtn(actions, '✅ Завершить ход', () => {
+      if (ws && ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ type: 'endTurn' }));
+      selected.clear();
+      pendingShotCell = null;
+      blindMode = false;
+    }, 'primary');
+  }
+
+  if (state.phase === 'over') { 
+    addBtn(actions, '🔄 В лобби', () => leaveGame(), 'primary'); 
+  } 
+}
+
+function addBtn(parent, text, fn, cls) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  if (cls) b.className = cls;
+  if (fn) b.onclick = fn;
+  parent.appendChild(b);
+  return b;
+}
+
+function commitSetup() {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ type: 'setup', units: setupUnits }));
+  setupUnits = [];
+}
+
+function rotateSelected(dir) {
+  if (!state || state.turn !== myRole) return;
+  if (selected.size === 0) { showToast('Выберите бойца'); return; }
+  selected.forEach(id => {
+    const u = state.units.find(x => x.id === id);
+    if (u && !u.acted) {
+      ws.send(JSON.stringify({ type: 'action', action: 'rotate', id, dir }));
+    }
+  });
+  render();
+}
+
+function autoSetup() {
+  const isDef = myRole === 'defender';
+  const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
+  const need = isDef ? spec.defender : spec.attacker;
+  const zone = isDef ? [0, 6] : [13, SIZE - 1];
+  const taken = new Set();
+  setupUnits = [];
+  let attempts = 0;
+  while (setupUnits.length < need && attempts < 2000) {
+    attempts++;
+    const y = zone[0] + Math.floor(Math.random() * (zone[1] - zone[0] + 1));
+    const x = Math.floor(Math.random() * SIZE);
+    const cell = MAP[y][x];
+    if (!cell || cell.terrain === 'unknown') continue;
+    if (cell.terrain === 'river' && !cell.bridge) continue;
+    const k = y + ',' + x;
+    if (taken.has(k)) continue;
+    taken.add(k);
+    setupUnits.push({ x, y });
+  }
+  render();
+}
+
+function showToast(text) {
+  const t = document.getElementById('toast');
+  const tt = document.getElementById('toastText');
+  if (!t || !tt) return;
+  tt.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 3500);
+}
+
+function hideToast() {
+  const t = document.getElementById('toast');
+  if (t) t.classList.remove('show');
+}
+
+window.addEventListener('resize', () => {
+  if (state) { resizeCanvas(); render(); }
+});
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { if (state) { resizeCanvas(); render(); } }, 200);
+});
