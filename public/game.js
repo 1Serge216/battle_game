@@ -386,7 +386,7 @@ function updateBottomPanel() {
         });
     }
 }
-Вы правы, я нарушил порядок функций. Вот итоговый код в правильной последовательности: от обработчиков кликов и событий к функциям UI (включая updateTopBar), затем логика расстановки (autoSetup и остальные).
+
 
 function cellFromEvent(e) {
   const r = canvas.getBoundingClientRect();
