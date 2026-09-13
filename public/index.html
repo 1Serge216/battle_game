@@ -1,274 +1,107 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>War Game</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-    html, body {
-      margin: 0;
-      height: 100%;
-      overscroll-behavior: none;
-    }
-    body {
-      background: #14141c;
-      color: #eee;
-      font-family: system-ui, -apple-system, sans-serif;
-      overflow: hidden;
-      touch-action: manipulation;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>War Game</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+html, body { margin: 0; height: 100%; overscroll-behavior: none; }
+body { background: #14141c; color: #eee; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: manipulation; }
 
-    .screen {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      overflow-y: auto;
-    }
-    .hidden { display: none !important; }
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: 16px; overflow-y: auto; }
+.hidden { display: none !important; }
 
-    #lobby h1 {
-      text-align: center;
-      font-size: 28px;
-      margin: 20px 0;
-    }
-    .card {
-      background: #26263a;
-      border-radius: 12px;
-      padding: 18px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      min-height: 60px;
-      transition: background 0.2s;
-    }
-    .card:active { background: #3a3a55; }
-    .card h2 {
-      margin: 0 0 6px;
-      font-size: 18px;
-    }
-    .card p {
-      margin: 0;
-      color: #aaa;
-      font-size: 14px;
-      line-height: 1.4;
-    }
+#lobby h1 { text-align: center; font-size: 28px; margin: 20px 0; }
+.card { background: #26263a; border-radius: 12px; padding: 18px; margin-bottom: 12px; cursor: pointer; min-height: 60px; }
+.card:active { background: #3a3a55; }
+.card h2 { margin: 0 0 6px; font-size: 18px; }
+.card p { margin: 0;зор color: #aaa; font-size: 14px; line-height: 1.4; }
 
-    #gameScreen {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      padding: 0;
-    }
-    #topBar {
-      background: #1b1b28;
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid #2a2a3a;
-      flex-shrink: 0;
-    }
-    #turnDot {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    #turnDot.blue { background: #4a8; box-shadow: 0 0 8px #4a8; }
-    #turnDot.red { background: #c44; box-shadow: 0 0 8px #c44; }
-    #turnInfo {
-      font-size: 14px;
-      flex: 1;
-    }
-    #infoBtn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: #3a3a5a;
-      border: none;
-      color: #eee;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #leaveBtn {
-      background: #c44;
-      color: #fff;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-    }
+#gameScreen { display: flex; flex-direction: column; height: 100%; padding: 0; }
+#topBar { background: #1b1b28; padding: 8px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; }
+#turnDot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
+#turnDot.blue { background: #4a8; box-shadow: 0 0 8px #4a8; }
+#turnDot.red { background: #c44; box-shadow: 0 0 8px #c44; }
+#turnInfo { font-size: 14px; flex: 1; }
+#infoBtn { width: 32px; height: 32px; border-radius: 50%; background: #3a3a5a; border: none; color: #eee; font-size: 16px; font-weight: bold; cursor: pointer; }
+#leaveBtn { background: #c44; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 
-    #boardWrap {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-      position: relative;
-    }
-    canvas { display: block; }
+#boardWrap { flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+canvas { display: block; }
 
-    #bottomPanel {
-      background: #1b1b28;
-      padding: 8px;
-      border-top: 1px solid #2a2a3a;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex-shrink: 0;
-      max-height: 45vh;
-      overflow-y: auto;
-    }
-    .row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    #stats {
-      font-size: 12px;
-      color: #aaa;
-      padding: 2px 0;
-    }
+#bottomPanel { background: #1b1b28; padding: 8px; border-top: 1px solid #2a2a3a; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; max-height: 45vh; overflow-y: auto; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+#stats { font-size: 12px; color: #aaa; padding: 2px 0; }
 
-    button {
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: none;
-      font-size: 14px;
-      background: #3a3a5a;
-      color: #eee;
-      cursor: pointer;
-      font-weight: 500;
-      min-height: 44px;
-      min-width: 44px;
-    }
-    button.primary { background: #4a8; color: #fff; }
-    button:disabled {
-      opacity: 0.35;
-      cursor: default;
-    }
-    button.arrowBtn {
-      padding: 8px 10px;
-      font-size: 20px;
-      min-width: 44px;
-    }
+button { padding: 10px 14px; border-radius: 8px; border: none; font-size: 14px; background: #3a3a5a; color: #eee; cursor: pointer; font-weight: 500; min-height: 44px; min-width: 44px; touch-action: manipulation; }
+button:active { background: #4a4a7a; }
+button.primary { background: #4a8; color: #fff; }
+button:disabled { opacity: 0.45; cursor: default; }
+button.arrowBtn { padding: 8px 10px; font-size: 20px; min-width: 44px; }
+button.waitingBtn { background: #555; color: #ccc; opacity: 0.7; }
 
-    #hintPopup {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      right: 8px;
-      background: #2a2a3a;
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #ccc;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-      z-index: 50;
-      display: none;
-    }
-    #hintPopup.show { display: block; }
-    #hintPopup .close {
-      float: right;
-      cursor: pointer;
-      opacity: 0.6;
-      margin-left: 8px;
-    }
+#hintPopup { position: absolute; top: 8px; left: 8px; right: 8px; background: #2a2a3a; padding: 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,0.5); z-index: 50; display: none; }
+#hintPopup.show { display: block; }
+#hintPopup .close { float: right; cursor: pointer; opacity: 0.6; margin-left: 8px; }
 
-    #toast {
-      position: fixed;
-      bottom: 100px;
-      right: 12px;
-      background: #333;
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      max-width: 70%;
-      display: none;
-      z-index: 100;
-    }
-    #toast.show { display: block; }
-  </style>
+#toast { position: fixed; bottom: 100px; right: 12px; background: #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; max-width: 70%; display: none; z-index: 100; }
+#toast.show { display: block; }
+#toast .close { float: right; cursor: pointer; margin-left: 8px; opacity: 0.6; }
+</style>
 </head>
 <body>
 
-  <div id="lobby" class="screen">
-    <h1>⚔️ War Game</h1>
-    <div class="card" onclick="showRules()">
-      <h2>📖 Как играть</h2>
-      <p>Правила, цели, местность, направления</p>
-    </div>
-    <div class="card" onclick="joinQueue('10v20')">
-      <h2>⚔️ Режим 10 vs 20</h2>
-      <p>Защитник — 10 бойцов. Атакующий — 20 бойцов</p>
-    </div>
-    <div class="card" onclick="joinQueue('15v30')">
-      <h2>⚔️ Режим 15 vs 30</h2>
-      <p>Защитник — 15 бойцов. Атакующий — 30 бойцов</p>
-    </div>
-  </div>
+<div id="lobby" class="screen">
+<h1>⚔️ War Game</h1>
+<div class="card" onclick="showRules()"><h2>📖 Как играть</h2><p>Правила, цели, местность, направления</p></div>
+<div class="card" onclick="joinQueue('10v20')"><h2>⚔️ Режим 10 vs 20</h2><p>Защитник — 10 бойцов. Атакующий — 20 бойцов</p></div>
+, <div class="card" onclick="joinQueue(' −15v30')"><h2>⚔️ Режим 15 vs25 30</h2><p>Защитник — 15% бойцов. Атак кующий — 30 бойцов</p></div>
+</div>
 
-  <div id="rules" class="screen hidden">
-    <h1>📖 Правила</h1>
-    <div class="card" onclick="hideRules()">← Назад</div>
-    <div class="card" style="cursor:default">
-      <p><b>Цель:</b> уничтожить всех бойцов противника.</p>
-      <p><b>Поле:</b> 20×20. Река, мосты, холмы, лес.</p>
-      <p><b>Ход:</b> 1 клетка в любом из 8 направлений (прямые + диагонали), ИЛИ поворот, ИЛИ выстрел. Ошибочный клик ход не тратит.</p>
-      <p><b>Обзор и стрельба:</b> по 3 линиям (главная + 2 смежные) в направлении бойца.</p>
-      <p><b>Дальность:</b> обзор 9, стрельба 6.</p>
-      <p><b>Холм:</b> +2 стрельба, +3 обзор, +15% точность. Игнорирует препятствия.</p>
-      <p><b>Лес:</b> скрывает бойца, блокирует обзор, −25% к попаданию по цели в лесу.</p>
-      <p><b>Жизни:</b> 2 у каждого бойца.</p>
-    </div>
-  </div>
+<div id="rules" class="screen hidden">
+<h1>📖 Правила</h1>
+<div class="card" onclick="hideRules()">← Назад</div>
+<div class="card" style="cursor:default">
+<p><b>Цель:</b> уничтожить всех бойцов противника.</p>
+<p><b>Поле:</b> 20×20. Река, мосты, холмы, лес.</p>
+<p><b>Ход:</b> 1 клетка в любом из 8 направлений, ИЛИ поворот, ИЛИ выстрел.</p>
+<p><b>Обзор и стрельба:</b> по 3 линиям (главная + 2 смежные).</p>
+<p><b>Дальность:</b> обзор 9, стрельба 6.</p>
+<p><b>Холм:</b> +2 стрельба, +3 обзор, +15% точность. Игнорирует препятствия.</p>
+<p><b>Лес:</b> скрывает бойца, блокирует об попаданию.</p>
+<p><b>Жизни:</b> 2 у каждого бойца.</p>
+</div>
+</div>
 
-  <div id="waitingScreen" class="screen hidden">
-    <h1>🔍 Поиск соперника...</h1>
-    <p style="text-align:center;color:#aaa">Ждём, пока кто-то выберет тот же режим</p>
-    <button onclick="cancelQueue()" style="margin-top:20px">Отменить</button>
-  </div>
+<div id="waitingScreen" class="screen hidden">
+<h1>🔍 Поиск соперника...</h1>
+<p style="text-align:center;color:#aaa">Ждём, пока кто-то выберет тот же режим</p>
+<button onclick="cancelQueue()" style="margin-top:20px">Отменить</button>
+</div>
 
-  <div id="gameScreen" class="screen hidden">
-    <div id="topBar">
-      <div id="turnDot" class="blue"></div>
-      <div id="turnInfo"></div>
-      <button id="infoBtn" onclick="toggleHint()">i</button>
-      <button id="leaveBtn" onclick="leaveGame()">Выйти</button>
-    </div>
-    <div id="boardWrap">
-      <canvas id="board"></canvas>
-      <div id="hintPopup">
-        <span class="close" onclick="toggleHint()">✕</span>
-        <div id="hintContent"></div>
-      </div>
-    </div>
-    <div id="bottomPanel">
-      <div id="stats"></div>
-      <div class="row" id="actionRow"></div>
-      <div class="row" id="dirRow"></div>
-    </div>
-  </div>
+<div id="gameScreen" class="screen hidden">
+<div id="topBar">
+<div id="turnDot" class="blue"></div>
+<div id="turnInfo"></div>
+<button id="infoBtn" onclick="toggleHint()">i</button>
+<button id="leaveBtn" onclick="leaveGame()">Выйти</button>
+</div>
+<div id="boardWrap">
+<canvas id="board"></canvas>
+<div id="hintPopup"><span class="close" onclick="toggleHint()">✕</span><div id="hintContent"></div></div>
+</div>
+<div id="bottomPanel">
+<div id="stats"></div>
+<div class="row" id="actionRow"></div>
+<div class="row" id="dirRow"></div>
+</div>
+</div>
 
-  <div id="toast"></div>
+<div id="toast"></div>
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="game.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
