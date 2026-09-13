@@ -88,7 +88,7 @@ function connectWS() {
     };
 }
 
-// ФУНКЦИЯ ОЧИСТКИ ВРЕМЕННЫХ ДАННЫХ ПРИ ПОЛУЧЕНИИ НОВОГО СОСТОЯНИЯ
+// Очистка временных данных происходит только при получении нового состояния от сервера
 function onStateUpdate() {
     if (!state) return;
     resizeCanvas();
@@ -157,13 +157,33 @@ function render() {
     if (state.phase === 'setup') {
         const isDef = myRole === 'defender';
         const z = isDef ? [0, 6] : [13, SIZE - 1];
+        const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
+        const need = isDef ? spec.defender : spec.attacker;
         
+        // Фон зоны расстановки
         ctx.fillStyle = 'rgba(100,200,100,0.12)';
         ctx.fillRect(0, z[0] * CELL, canvas.width, (z[1] - z[0] + 1) * CELL);
         ctx.strokeStyle = 'rgba(100,200,100,0.5)';
         ctx.strokeRect(0, z[0] * CELL, canvas.width, (z[1] - z[0] + 1) * CELL);
 
-        state.setupZones?.forEach(u => drawUnit(u.x, u.y, isDef ? 4 : 0, isDef ? '#4a8' : '#c44', false, false, 2));
+        // Юниты, которые прислал сервер (если есть)
+        state.setupZones?.forEach(u => {
+            drawUnit(u.x, u.y, isDef ? 4 : 0, isDef ? '#4a8' : '#c44', false, false, 2);
+        });
+
+        // ВАШИ локально расставленные юниты (исправление проблемы "бойцов не видно")
+        const color = isDef ? '#4a8' : '#c44';
+        setupUnits.forEach(u => {
+            drawUnit(u.x, u.y, isDef ? 4 : 0, color, false, false, 2);
+        });
+
+        stats.textContent = 'Поставлено: ' + setupUnits.length + '/' + need + ' бойцов';
+        addBtn(actions, '🎲 Авто-расстановка', autoSetup);
+        addBtn(actions, 'Очистить', () => { setupUnits = []; render(); });
+        const ready = setupUnits.length === need;
+        const b = addBtn(actions, '✅ Готов', commitSetup, 'primary');
+        b.disabled = !ready;
+        return;
     }
 
     if (state.phase !== 'setup') {
@@ -301,7 +321,7 @@ function highlightUnit(u) {
     }
 }
 
-// ИСПРАВЛЕНА ЛОГИКА ПРОВЕРКИ ГРАНИЦ (БЫЛО nx < 0 ny < 0)
+// ИСПРАВЛЕНА ЛОГИКА ПРОВЕРКИ ГРАНИЦ (добавлены ||)
 function getMoveCells(u) {
     const dirs = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
     const out = [];
@@ -326,7 +346,7 @@ function viewLineDirs(dir) {
     return [(dir + 7) % 8, dir, (dir + 1) % 8];
 }
 
-// ИСПРАВЛЕНА ЛОГИКА ПРОВЕРКИ ГРАНИЦ (БЫЛО nx < 0 ny < 0)
+// ИСПРАВЛЕНА ЛОГИКА ПРОВЕРКИ ГРАНИЦ (добавлены ||)
 function getShotCells(u) {
     const onHill = MAP[u.y][u.x].terrain === 'hill';
     const range = SHOOT_RANGE + (onHill ? 2 : 0);
@@ -449,10 +469,24 @@ function addBtn(parent, text, fn, cls) {
   return b;
 }
 
-// ФУНКЦИЯ ОТПРАВКИ БОЛЬШЕ НЕ ЧИСТИТ МАССИВ ТУТ ЖЕ
+// ПОЧИНЕННАЯ ФУНКЦИЯ "ГОТОВ" (ждет открытия сокета и проверяет длину массива)
 function commitSetup() {
-  if (ws && ws.readyState === WebSocket.OPEN && setupUnits.length > 0) {
+  if (!ws) return;
+  
+  if (ws.readyState === WebSocket.OPEN && setupUnits.length > 0) {
     ws.send(JSON.stringify({ type: 'setup', units: setupUnits }));
+    return;
+  }
+
+  if (ws.readyState === WebSocket.CONNECTING) {
+    showToast('Ожидание соединения...');
+    const handler = () => {
+      if (setupUnits.length > 0) {
+        ws.send(JSON.stringify({ type: 'setup', units: setupUnits }));
+      }
+      ws.removeEventListener('open', handler);
+    };
+    ws.addEventListener('open', handler);
   }
 }
 
@@ -460,7 +494,6 @@ function rotateSelected(dir) {
   if (!state || state.turn !== myRole) return;
   if (selected.size === 0) { showToast('Выберите бойца'); return; }
   
-  // Отправляем поворот для каждого юнита индивидуально
   selected.forEach(id => {
     const u = state.units.find(x => x.id === id);
     if (u && !u.acted) {
@@ -484,7 +517,7 @@ function autoSetup() {
     const x = Math.floor(Math.random() * SIZE);
     const cell = MAP[y][x];
     if (!cell || cell.terrain === 'unknown') continue;
-    if (cell.terrain === 'river' && !c.bridge) continue;
+    if (cell.terrain === 'river' && !cell.bridge) continue;
     const k = y + ',' + x;
     if (taken.has(k)) continue;
     taken.add(k);
