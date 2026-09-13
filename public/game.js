@@ -104,7 +104,7 @@ else showToast('Вы ранили');
 }
 }
 
-if (state.phase === 'battle') {
+if (state.phase === 'battle' && setupUnits.length > 0) {
 setupUnits = [];
 }
 
@@ -155,9 +155,16 @@ ctx.strokeStyle = 'rgba(100,200,100,0.5)';
 ctx.strokeRect(0, z[0] * CELL, canvas.width, (z[1] - z[0] + 1) * CELL);
 
 const color = isDef ? '#4a8' : '#c44';
+// уже отправленная расстановка (если myReady)
+state.units.filter(u => u.owner === myRole).forEach(u => {
+drawUnit(u.x, u.y, u.dir, color, false, false, u.hp);
+});
+// текущая локальная расстановка (пока не нажал Готов)
+if (!state.myReady) {
 setupUnits.forEach(u => {
 drawUnit(u.x, u.y, isDef ? 4 : 0, color, false, false, 2);
 });
+}
 }
 
 if (state.phase !== 'setup') {
@@ -194,7 +201,6 @@ ctx.fillStyle = '#0a0a0f';
 ctx.fillRect(px, py, CELL, CELL);
 return;
 }
-
 switch (c.terrain) {
 case 'river': ctx.fillStyle = c.bridge ? '#8b6b3a' : '#3a6ea5'; break;
 case 'hill': ctx.fillStyle = '#7a6a4a'; break;
@@ -213,7 +219,6 @@ ctx.moveTo(px, py + CELL * 0.85);
 ctx.lineTo(px + CELL, py + CELL * 0.85);
 ctx.stroke();
 }
-
 if (c.terrain === 'forest') {
 ctx.fillStyle = 'rgba(0,0,0,0.45)';
 for (let i = 0; i < 3; i++) {
@@ -222,7 +227,6 @@ ctx.arc(px + CELL * 0.25 + i * CELL * 0.25, py + CELL * 0.4 + (i % 2) * CELL * 0
 ctx.fill();
 }
 }
-
 if (c.terrain === 'hill') {
 ctx.fillStyle = 'rgba(255,255,255,0.18)';
 ctx.beginPath();
@@ -238,7 +242,6 @@ ctx.fill();
 function drawUnit(x, y, dir, color, isSel, dim, hp) {
 const px = x * CELL + CELL / 2, py = y * CELL + CELL / 2;
 ctx.globalAlpha = dim ? 0.7 : 1;
-
 ctx.fillStyle = color;
 ctx.beginPath();
 ctx.arc(px, py, CELL * 0.34, 0, Math.PI * 2);
@@ -263,7 +266,6 @@ ctx.beginPath();
 ctx.moveTo(px + v[0] * CELL * 0.22, py + v[1] * CELL * 0.22);
 ctx.lineTo(px + v[0] * CELL * 0.42, py + v[1] * CELL * 0.42);
 ctx.stroke();
-
 ctx.globalAlpha = 1;
 }
 
@@ -271,7 +273,6 @@ function highlightUnit(u) {
 const moves = getMoveCells(u);
 ctx.fillStyle = 'rgba(120,255,120,0.35)';
 moves.forEach(c => ctx.fillRect(c.x * CELL, c.y * CELL, CELL, CELL));
-
 const shots = getShotCells(u);
 ctx.fillStyle = 'rgba(180,180,180,0.22)';
 shots.forEach(c => {
@@ -279,7 +280,6 @@ if (!moves.some(m => m.x === c.x && m.y === c.y)) {
 ctx.fillRect(c.x * CELL, c.y * CELL, CELL, CELL);
 }
 });
-
 if (pendingShotCell) {
 ctx.strokeStyle = '#f0a020';
 ctx.lineWidth = 3;
@@ -306,10 +306,7 @@ const DIR_VECS = [
 { dx: 0, dy: -1 }, { dx: 1, dy: -1 }, { dx: 1, dy: 0 }, { dx: 1, dy: 1 },
 { dx: 0, dy: 1 }, { dx: -1, dy: 1 }, { dx: -1, dy: 0 }, { dx: -1, dy: -1 }
 ];
-
-function viewLineDirs(dir) {
-return [(dir + 7) % 8, dir, (dir + 1) % 8];
-}
+function viewLineDirs(dir) { return [(dir + 7) % 8, dir, (dir + 1) % 8]; }
 
 function getShotCells(u) {
 const onHill = MAP[u.y][u.x].terrain === 'hill';
@@ -359,6 +356,14 @@ if (state.phase === 'setup') {
 const isDef = myRole === 'defender';
 const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
 const need = isDef ? spec.defender : spec.attacker;
+
+if (state.myReady) {
+stats.innerHTML = '<b style="color:#4a8">✅ Вы готовы.</b> Ожидание соперника…';
+const b = addBtn(actions, '⏳ Ожидание соперника', null, 'waitingBtn');
+b.disabled = true;
+return;
+}
+
 stats.textContent = 'Поставлено: ' + setupUnits.length + '/' + need + ' бойцов';
 addBtn(actions, '🎲 Авто-расстановка', autoSetup);
 addBtn(actions, 'Очистить', () => { setupUnits = []; render(); });
@@ -374,7 +379,7 @@ const notMoved = mine.filter(u => !u.acted).length;
 stats.textContent = 'Моих бойцов: ' + mine.length + ' · Ещё не сходили: ' + notMoved + ' · Всего на поле: ' + state.units.length;
 
 if (state.turn !== myRole) {
-const b = addBtn(actions, '⏳ Ожидание соперника', null);
+const b = addBtn(actions, '⏳ Ожидание соперника', null, 'waitingBtn');
 b.disabled = true;
 return;
 }
@@ -436,7 +441,7 @@ const zone = isDef ? [0, 6] : [13, SIZE - 1];
 const taken = new Set();
 setupUnits = [];
 let attempts = 0;
-while (setupUnits.length < need && attempts < 2000) {
+while (setupUnits.length < need && attempts < 3000) {
 attempts++;
 const y = zone[0] + Math.floor(Math.random() * (zone[1] - zone[0] + 1));
 const x = Math.floor(Math.random() * SIZE);
@@ -452,9 +457,12 @@ render();
 }
 
 function commitSetup() {
-if (ws && ws.readyState === WebSocket.OPEN && setupUnits.length > 0) {
+if (!ws || ws.readyState !== WebSocket.OPEN) { showToast('Нет соединения'); return; }
+const isDef = myRole === 'defender';
+const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
+const need = isDef ? spec.defender : spec.attacker;
+if (setupUnits.length !== need) { showToast('Поставьте всех бойцов'); return; }
 ws.send(JSON.stringify({ type: 'setup', units: setupUnits }));
-}
 }
 
 function rotateSelected(dir) {
@@ -473,22 +481,18 @@ function cellFromEvent(e) {
 const r = canvas.getBoundingClientRect();
 let cx, cy;
 if (e.touches && e.touches[0]) {
-cx = e.touches[0].clientX - r.left;
-cy = e.touches[0].clientY - r.top;
+cx = e.touches[0].clientX - r.left; cy = e.touches[0].clientY - r.top;
 } else if (e.changedTouches && e.changedTouches[0]) {
-cx = e.changedTouches[0].clientX - r.left;
-cy = e.changedTouches[0].clientY - r.top;
+cx = e.changedTouches[0].clientX - r.left; cy = e.changedTouches[0].clientY - r.top;
 } else {
-cx = e.clientX - r.left;
-cy = e.clientY - r.top;
+cx = e.clientX - r.left; cy = e.clientY - r.top;
 }
 return { x: Math.floor(cx / CELL), y: Math.floor(cy / CELL) };
 }
 
 canvas.addEventListener('mousedown', (e) => {
 if (!state || state.phase !== 'battle') return;
-dragStart = cellFromEvent(e);
-dragEnd = null;
+dragStart = cellFromEvent(e); dragEnd = null;
 });
 canvas.addEventListener('mousemove', (e) => {
 if (dragStart) { dragEnd = cellFromEvent(e); render(); }
@@ -497,8 +501,7 @@ canvas.addEventListener('mouseup', (e) => handlePointerUp(e));
 
 canvas.addEventListener('touchstart', (e) => {
 if (!state || state.phase !== 'battle') return;
-dragStart = cellFromEvent(e);
-dragEnd = null;
+dragStart = cellFromEvent(e); dragEnd = null;
 }, { passive: true });
 canvas.addEventListener('touchmove', (e) => {
 if (dragStart) { dragEnd = cellFromEvent(e); render(); }
@@ -530,12 +533,16 @@ function handleClick(c, multi) {
 if (!state) return;
 
 if (state.phase === 'setup') {
+if (state.myReady) return;
 const isDef = myRole === 'defender';
 const spec = state.mode === '10v20' ? { defender: 10, attacker: 20 } : { defender: 15, attacker: 30 };
 const need = isDef ? spec.defender : spec.attacker;
 const zone = isDef ? [0, 6] : [13, SIZE - 1];
 if (c.y < zone[0] || c.y > zone[1]) return;
-if (setupUnits.length >= need) return;
+if (setupUnits.length >= need) {
+const idx0 = setupUnits.findIndex(u => u.x === c.x && u.y === c.y);
+if (idx0 < 0) return;
+}
 const cell = MAP[c.y] && MAP[c.y][c.x];
 if (!cell || cell.terrain === 'unknown') return;
 if (cell.terrain === 'river' && !cell.bridge) return;
@@ -556,7 +563,6 @@ if (selected.has(clicked.id)) selected.delete(clicked.id);
 else selected.add(clicked.id);
 } else {
 if (selected.size === 1 && selected.has(clicked.id)) {
-// оставляем выделенным
 } else {
 selected.clear();
 selected.add(clicked.id);
@@ -571,7 +577,6 @@ return;
 if (selected.size === 1) {
 const u = state.units.find(x => selected.has(x.id));
 if (!u || u.acted) return;
-
 if (blindMode) {
 const shots = getShotCells(u);
 if (shots.some(s => s.x === c.x && s.y === c.y)) {
@@ -581,7 +586,6 @@ selected.delete(u.id);
 }
 return;
 }
-
 if (clicked && clicked.owner !== myRole) {
 if (pendingShotCell && pendingShotCell.x === c.x && pendingShotCell.y === c.y) {
 ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
@@ -594,7 +598,6 @@ pendingShotCell = { x: c.x, y: c.y };
 render();
 return;
 }
-
 const moves = getMoveCells(u);
 if (moves.some(m => m.x === c.x && m.y === c.y)) {
 const dx = c.x - u.x, dy = c.y - u.y;
@@ -603,7 +606,6 @@ selected.delete(u.id);
 render();
 return;
 }
-
 selected.clear();
 pendingShotCell = null;
 render();
@@ -638,10 +640,7 @@ render();
 function toggleHint() {
 const el = document.getElementById('hintPopup');
 const content = document.getElementById('hintContent');
-if (el.classList.contains('show')) {
-el.classList.remove('show');
-return;
-}
+if (el.classList.contains('show')) { el.classList.remove('show'); return; }
 if (!state) return;
 let html = '';
 if (state.phase === 'battle') {
@@ -662,7 +661,7 @@ html = '<b>Расстановка</b><br>' +
 (myRole === 'defender'
 ? 'Защитник (синие). Видит всю карту.'
 : 'Атакующий (красные). Видит только свою зону.') +
-'<br><br>Кликай по зелёной зоне, чтобы ставить бойцов.';
+'<br><br>Кликай по зелёной зоне, чтобы ставить бойцов. Когда все поставлены — жми «Готов».';
 }
 content.innerHTML = html;
 el.classList.add('show');
@@ -671,13 +670,13 @@ el.classList.add('show');
 function showToast(text) {
 const t = document.getElementById('toast');
 const tt = document.getElementById('toastText');
-if (!t || !tt) return;
-tt.textContent = text;
+if (!t) return;
+if (tt) tt.textContent = text;
+else t.textContent = text;
 t.classList.add('show');
 clearTimeout(toastTimer);
 toastTimer = setTimeout(hideToast, 3500);
 }
-
 function hideToast() {
 const t = document.getElementById('toast');
 if (t) t.classList.remove('show');
