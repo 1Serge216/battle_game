@@ -504,4 +504,4 @@ function hitChance(room, s, t) {
   return Math.max(0.05, Math.min(0.95, p));
 }
 
-server.listen(PORT, () => console.log('http://localhost:' + PORT));
+server.listen(PORT, '0.0.0.0',  () => console.log('http://localhost:' + PORT));
