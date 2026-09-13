@@ -1,4 +1,4 @@
-const http = require('http');
+аconst http = require('http');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
@@ -146,17 +146,37 @@ function publicState(room, role) {
   });
 
   const mapOut = [];
-  for (let y = 0; y < SIZE; y++) {
-    const row = [];
-    for (let x = 0; x < SIZE; x++) {
-      const key = y + ',' + x;
-      const vis = role === 'defender' || visible.has(key);
-      row.push(vis
-        ? { terrain: room.map[y][x].terrain, bridge: room.map[y][x].bridge }
-        : { terrain: 'unknown', bridge: false });
+// В фазе расстановки каждый игрок видит свою зону
+let setupZone = null;
+if (room.phase === 'setup') {
+  setupZone = role === 'defender' ? [0, 6] : [13, SIZE - 1];
+}
+
+for (let y = 0; y < SIZE; y++) {
+  const row = [];
+  for (let x = 0; x < SIZE; x++) {
+    const key = `${y},${x}`;
+    
+    // По умолчанию защитник видит всё, атакующий — только отмеченные клетки
+    let vis = role === 'defender' || visible.has(key);
+    
+    // Расширяем видимость до своей стартовой зоны в фазе расстановки
+    if (setupZone && y >= setupZone[0] && y <= setupZone[1]) {
+      vis = true;
     }
-    mapOut.push(row);
+
+    row.push(vis
+      ? { 
+          terrain: room.map[y][x].terrain, 
+          bridge: room.map[y][x].bridge 
+        }
+      : { 
+          terrain: 'unknown', 
+          bridge: false 
+        });
   }
+  mapOut.push(row);
+}
 
   const units = room.units
     .filter(u => {
