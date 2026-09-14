@@ -134,7 +134,7 @@ function autoPlaceUnits(room, role) {
     if (y < 0 || y >= SIZE) continue;
     for (let x = 0; x < SIZE; x++) {
       if (placed >= need) break outer;
-      const cell room = room.map[y][x];
+      const cell = room.map[y][x];
       if (cell.terrain === 'river' && !cell.bridge) continue;
       const k = y + ',' + x;
       if (taken.has(k)) continue;
