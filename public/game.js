@@ -721,4 +721,4 @@ function hideShotToast() {
 window.addEventListener('resize', () => { if (state) { resizeCanvas(); render(); } });
 window.addEventListener('orientationchange', () => {
     setTimeout(() => { if (state) { resizeCanvas(); render(); } }, 200);
-});```
+});
