@@ -1,276 +1,73 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const WebSocket = require('ws');
+
+const PORT = process.env.PORT || 3000;
 const SIZE = 20;
 const SHOOT_RANGE = 6;
 const VIEW_RANGE = 9;
-let CELL = 36;
-let MAP = null;
-let ws = null;
-let state = null;
-let myRole = null;
-let selected = new Set();
-let aimMode = false;
-let confirmEndArmed = false;
-let dragStart = null, dragEnd = null;
-let lastShotEventAt = 0;
-let toastTimer = null;
-let shotToastTimer = null;
-let animation = null;
+const DRAW_LIMIT = 50;
 
-const canvas = document.getElementById('board');
-const ctx = canvas.getContext('2d');
+const MODES = {
+  '10v20': { defender: 10, attacker: 20 },
+  '15v15': { player1: 15, player2: 15 }
+};
 
-if (window.Telegram && window.Telegram.WebApp) {
-  try {
-    window.Telegram.WebApp.ready();
-    window.Telegram.WebApp.expand();
-    if (window.Telegram.WebApp.disableVerticalSwipes) window.Telegram.WebApp.disableVerticalSwipes();
-  } catch (e) {}
-}
-
-function showScreen(id) {
-  ['lobby', 'rules', 'waitingScreen', 'gameScreen'].forEach(s => {
-    const el = document.getElementById(s);
-    if (el) el.classList.toggle('hidden', s !== id);
+const server = http.createServer((req, res) => {
+  const file = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
+  fs.readFile(file, (e, data) => {
+    if (e) { res.writeHead(404); res.end('404'); return; }
+    const ext = path.extname(file);
+    const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' }[ext] || 'text/plain';
+    res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' });
+    res.end(data);
   });
-}
-function showRules() { showScreen('rules'); }
-function hideRules() { showScreen('lobby'); }
+});
 
-function joinQueue(mode) {
-  if (!ws) connectWS();
-  ws._pendingMode = mode;
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'joinQueue', mode }));
-  }
-  showScreen('waitingScreen');
-}
-function cancelQueue() {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'cancelQueue' }));
-  showScreen('lobby');
-}
-function leaveGame() {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'leave' }));
-  state = null; selected.clear(); aimMode = false;
-  showScreen('lobby');
-}
+function inside(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
 
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-  ws = new WebSocket(proto + location.host);
-  ws.onopen = () => {
-    if (ws._pendingMode) {
-      ws.send(JSON.stringify({ type: 'joinQueue', mode: ws._pendingMode }));
-      ws._pendingMode = null;
-    }
-  };
-  ws.onmessage = (ev) => {
-    const msg = JSON.parse(ev.data);
-    if (msg.type === 'matched') {
-      myRole = msg.role;
-      showScreen('gameScreen');
-      setTimeout(resizeCanvas, 50);
-    } else if (msg.type === 'waiting') {
-      showScreen('waitingScreen');
-    } else if (msg.type === 'queueCancelled') {
-      showScreen('lobby');
-    } else if (msg.type === 'state') {
-      state = msg.state;
-      onStateUpdate();
-    } else if (msg.type === 'opponentLeft') {
-      showToast('Соперник вышел из партии', 'info');
-      setTimeout(leaveGame, 1500);
-    } else if (msg.type === 'error') {
-      showToast(msg.message, 'error');
-    }
-  };
-}
-
-function onStateUpdate() {
-  if (!state) return;
-  resizeCanvas();
-  if (state.lastEvent && state.lastEvent.kind === 'shot' && state.lastEvent.by === myRole) {
-    if (state.lastEvent.at !== lastShotEventAt) {
-      lastShotEventAt = state.lastEvent.at;
-      playShotAnimation(state.lastEvent);
-      const e = state.lastEvent;
-      let msg = '';
-      if (e.blind) {
-        if (!e.hit) msg = 'Выстрел вслепую. Мимо.';
-        else if (e.killed) msg = 'Выстрел вслепую. Убит!';
-        else msg = 'Выстрел вслепую. Ранен.';
-      } else {
-        if (!e.hit) msg = 'Вы промахнулись';
-        else if (e.killed) msg = 'Вы убили!';
-        else msg = 'Вы ранили';
-      }
-      const kind = !e.hit ? 'miss' : (e.killed ? 'killed' : 'hit');
-      showShotToast(msg, kind);
-    }
-  }
-  render();
-}
-
-function playShotAnimation(ev) {
-  animation = {
-    fx: ev.from.x, fy: ev.from.y,
-    tx: ev.to.x, ty: ev.to.y,
-    start: performance.now(),
-    duration: 350
-  };
-  animateShot();
-}
-function animateShot() {
-  if (!animation) return;
-  const t = (performance.now() - animation.start) / animation.duration;
-  if (t >= 1) { animation = null; render(); return; }
-  render();
-  requestAnimationFrame(animateShot);
-}
-
-function resizeCanvas() {
-  const wrap = document.getElementById('boardWrap');
-  if (!wrap) return;
-  const w = wrap.clientWidth - 16;
-  const h = wrap.clientHeight - 16;
-  const size = Math.min(w, h);
-  if (size <= 0) return;
-  CELL = Math.floor(size / SIZE);
-  canvas.width = CELL * SIZE;
-  canvas.height = CELL * SIZE;
-}
-
-function render() {
-  if (!state || !state.map) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  MAP = state.map;
-
+function generateMap() {
+  const m = Array.from({ length: SIZE }, () =>
+    Array.from({ length: SIZE }, () => ({ terrain: 'plain', bridge: false }))
+  );
+  let rx = 10;
   for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) drawTerrain(x, y, MAP[y][x]);
-  }
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  for (let i = 0; i <= SIZE; i++) {
-    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, canvas.height); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(canvas.width, i * CELL); ctx.stroke();
-  }
-
-  if (selected.size === 1) {
-    const u = state.units.find(x => selected.has(x.id));
-    if (u && u.owner === myRole) highlightUnit(u);
-  }
-
-  state.units.forEach(u => {
-    const isMine = u.owner === myRole;
-    const baseColor = isMine ? '#4a80d0' : '#c44';
-    const dim = !isMine && state.turn === myRole;
-    drawUnit(u.x, u.y, u.dir, baseColor, selected.has(u.id), dim, u.hp);
-  });
-
-  if (dragStart && dragEnd) {
-    const x1 = Math.min(dragStart.x, dragEnd.x) * CELL;
-    const y1 = Math.min(dragStart.y, dragEnd.y) * CELL;
-    const x2 = Math.max(dragStart.x, dragEnd.x) * CELL;
-    const y2 = Math.max(dragStart.y, dragEnd.y) * CELL;
-    ctx.strokeStyle = '#4a80d0';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-  }
-
-  if (animation) {
-    const t = (performance.now() - animation.start) / animation.duration;
-    const px = (animation.fx + (animation.tx - animation.fx) * t) * CELL + CELL / 2;
-    const py = (animation.fy + (animation.ty - animation.fy) * t) * CELL + CELL / 2;
-    ctx.strokeStyle = 'rgba(255,255,80,0.6)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(animation.fx * CELL + CELL / 2, animation.fy * CELL + CELL / 2);
-    ctx.lineTo(px, py);
-    ctx.stroke();
-    ctx.fillStyle = '#ff4';
-    ctx.beginPath();
-    ctx.arc(px, py, CELL * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  updateTopBar();
-  updateBottomPanel();
-}
-
-function drawTerrain(x, y, c) {
-  const px = x * CELL, py = y * CELL;
-  if (c.terrain === 'unknown') {
-    ctx.fillStyle = '#0a0a0f';
-    ctx.fillRect(px, py, CELL, CELL);
-    return;
-  }
-  switch (c.terrain) {
-    case 'river': ctx.fillStyle = c.bridge ? '#8b6b3a' : '#3a6ea5'; break;
-    case 'hill': ctx.fillStyle = '#7a6a4a'; break;
-    case 'forest': ctx.fillStyle = '#2e5a2e'; break;
-    default: ctx.fillStyle = '#4a6a4a';
-  }
-  ctx.fillRect(px, py, CELL, CELL);
-  if (c.bridge) {
-    ctx.strokeStyle = '#3a2410';
-    ctx.lineWidth = Math.max(2, CELL * 0.08);
-    ctx.beginPath();
-    ctx.moveTo(px, py + CELL * 0.15); ctx.lineTo(px + CELL, py + CELL * 0.15);
-    ctx.moveTo(px, py + CELL * 0.85); ctx.lineTo(px + CELL, py + CELL * 0.85);
-    ctx.stroke();
-  }
-  if (c.terrain === 'forest') {
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.arc(px + CELL * 0.25 + i * CELL * 0.25, py + CELL * 0.4 + (i % 2) * CELL * 0.25, CELL * 0.13, 0, Math.PI * 2);
-      ctx.fill();
+    rx += Math.floor(Math.random() * 3) - 1;
+    rx = Math.max(7, Math.min(12, rx));
+    m[y][rx].terrain = 'river';
+    if (Math.random() < 0.35) {
+      const rx2 = Math.max(0, Math.min(SIZE - 1, rx + (Math.random() < 0.5 ? 1 : -1)));
+      m[y][rx2].terrain = 'river';
     }
   }
-  if (c.terrain === 'hill') {
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.beginPath();
-    ctx.moveTo(px + CELL * 0.1, py + CELL * 0.75);
-    ctx.quadraticCurveTo(px + CELL * 0.25, py + CELL * 0.35, px + CELL * 0.4, py + CELL * 0.6);
-    ctx.quadraticCurveTo(px + CELL * 0.55, py + CELL * 0.25, px + CELL * 0.7, py + CELL * 0.55);
-    ctx.quadraticCurveTo(px + CELL * 0.85, py + CELL * 0.4, px + CELL * 0.9, py + CELL * 0.75);
-    ctx.closePath();
-    ctx.fill();
+  const bridges = [];
+  while (bridges.length < 3) {
+    const y = 3 + Math.floor(Math.random() * (SIZE - 6));
+    if (!bridges.some(b => Math.abs(b - y) < 3)) bridges.push(y);
   }
-}
-
-function drawUnit(x, y, dir, color, isSel, dim, hp) {
-  const px = x * CELL + CELL / 2, py = y * CELL + CELL / 2;
-  ctx.globalAlpha = dim ? 0.75 : 1;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(px, py, CELL * 0.34, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = isSel ? '#ff0' : '#000';
-  ctx.lineWidth = isSel ? 3 : 1.5;
-  ctx.stroke();
-
-  ctx.fillStyle = '#000';
-  const dotR = CELL * 0.08;
-  if (hp === 2) {
-    ctx.beginPath(); ctx.arc(px - CELL * 0.09, py, dotR, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(px + CELL * 0.09, py, dotR, 0, Math.PI * 2); ctx.fill();
-  } else if (hp === 1) {
-    ctx.beginPath(); ctx.arc(px, py, dotR, 0, Math.PI * 2); ctx.fill();
-  }
-
-  const v = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]][dir];
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(px + v[0] * CELL * 0.22, py + v[1] * CELL * 0.22);
-  ctx.lineTo(px + v[0] * CELL * 0.42, py + v[1] * CELL * 0.42);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  bridges.forEach(y => {
+    for (let x = 0; x < SIZE; x++) if (m[y][x].terrain === 'river') m[y][x].bridge = true;
+  });
+  const place = (t, n) => {
+    let c = 0;
+    while (c < n) {
+      const y = 2 + Math.floor(Math.random() * (SIZE - 4));
+      const x = Math.floor(Math.random() * SIZE);
+      const cell = m[y][x];
+      if (cell.terrain === 'plain' && !cell.bridge) { cell.terrain = t; c++; }
+    }
+  };
+  place('hill', 18);
+  place('forest', 45);
+  return m;
 }
 
 const DIR_VECS = [
   { dx: 0, dy: -1 }, { dx: 1, dy: -1 }, { dx: 1, dy: 0 }, { dx: 1, dy: 1 },
   { dx: 0, dy: 1 }, { dx: -1, dy: 1 }, { dx: -1, dy: 0 }, { dx: -1, dy: -1 }
 ];
+
 function parallelStarts(u, dir) {
   const v = DIR_VECS[dir];
   const perp = { dx: -v.dy, dy: v.dx };
@@ -281,436 +78,401 @@ function parallelStarts(u, dir) {
   ];
 }
 
-function getShotCells(u) {
-  const onHill = MAP[u.y][u.x].terrain === 'hill';
-  const range = SHOOT_RANGE + (onHill ? 2 : 0);
-  const v = DIR_VECS[u.dir];
-  const starts = parallelStarts(u, u.dir);
+function lineCells(room, unit, range, ignoreObstacles) {
+  const v = DIR_VECS[unit.dir];
+  const starts = parallelStarts(unit, unit.dir);
   const out = [];
   for (const s of starts) {
     for (let k = 0; k < range; k++) {
-      const nx = s.x + v.dx * k, ny = s.y + v.dy * k;
-      if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) break;
+      const nx = s.x + v.dx * k;
+      const ny = s.y + v.dy * k;
+      if (!inside(nx, ny)) break;
       out.push({ x: nx, y: ny });
+      if (!ignoreObstacles) {
+        const t = room.map[ny][nx].terrain;
+        if (t === 'forest' || t === 'hill') break;
+      }
+    }
+  }
+  return out;
+}
+
+function visionCells(room, unit) {
+  const onHill = room.map[unit.y][unit.x].terrain === 'hill';
+  const range = VIEW_RANGE + (onHill ? 3 : 0);
+  return lineCells(room, unit, range, onHill);
+}
+
+const rooms = new Map();
+const waiting = { '10v20': [], '15v15': [] };
+let nextRoomId = 1;
+let nextUnitId = 1;
+
+function sendTo(ws, obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function autoPlaceUnits(room, role) {
+  const is10v20 = room.mode === '10v20';
+  let need, startY, dirY, dir;
+  if (is10v20) {
+    if (role === 'defender') { need = room.spec.defender; startY = 3; dirY = 1; dir = 4; }
+    else { need = room.spec.attacker; startY = 16; dirY = -1; dir = 0; }
+  } else {
+    need = 15;
+    if (role === 'player1') { startY = 3; dirY = 1; dir = 4; }
+    else { startY = 16; dirY = -1; dir = 0; }
+  }
+  const maxSteps = 4;
+  let placed = 0;
+  const taken = new Set();
+  room.units.forEach(u => taken.add(u.y + ',' + u.x));
+
+  outer:
+  for (let step = 0; step < maxSteps; step++) {
+    const y = startY + dirY * step;
+    if (y < 0 || y >= SIZE) continue;
+    for (let x = 0; x < SIZE; x++) {
+      if (placed >= need) break outer;
+      const cell = room.map[y][x];
+      if (cell.terrain === 'river' && !cell.bridge) continue;
+      const k = y + ',' + x;
+      if (taken.has(k)) continue;
+      taken.add(k);
+      room.units.push({
+        id: nextUnitId++,
+        owner: role,
+        x: x, y: y,
+        dir: dir,
+        hp: 2, acted: false
+      });
+      placed++;
+    }
+  }
+}
+
+function createRoom(mode) {
+  const spec = MODES[mode];
+  let roles, firstTurn;
+  if (mode === '10v20') {
+    roles = Math.random() < 0.5 ? ['defender', 'attacker'] : ['attacker', 'defender'];
+    firstTurn = 'defender';
+  } else {
+    roles = Math.random() < 0.5 ? ['player1', 'player2'] : ['player2', 'player1'];
+    firstTurn = Math.random() < 0.5 ? 'player1' : 'player2';
+  }
+  const room = {
+    id: 'room' + (nextRoomId++),
+    mode, spec, roles,
+    players: {},
+    map: generateMap(),
+    units: [],
+    phase: 'battle',
+    turn: firstTurn,
+    winner: null,
+    draw: false,
+    movesCount: {},
+    lastEvent: null,
+    drawProposed: null
+  };
+  if (mode === '10v20') {
+    autoPlaceUnits(room, 'defender');
+    autoPlaceUnits(room, 'attacker');
+  } else {
+    autoPlaceUnits(room, 'player1');
+    autoPlaceUnits(room, 'player2');
+  }
+  return room;
+}
+
+function publicState(room, role) {
+  const is15v15 = room.mode === '15v15';
+  const myUnits = room.units.filter(u => u.owner === role);
+  const visible = new Set();
+  myUnits.forEach(u => {
+    visionCells(room, u).forEach(c => visible.add(c.y + ',' + c.x));
+    visible.add(u.y + ',' + u.x);
+  });
+
+  const seesAll = !is15v15 && role === 'defender';
+
+  const mapOut = [];
+  for (let y = 0; y < SIZE; y++) {
+    const row = [];
+    for (let x = 0; x < SIZE; x++) {
+      const key = y + ',' + x;
+      const vis = seesAll || visible.has(key);
+      row.push(vis
+        ? { terrain: room.map[y][x].terrain, bridge: room.map[y][x].bridge }
+        : { terrain: 'unknown', bridge: false });
+    }
+    mapOut.push(row);
+  }
+
+  const units = room.units
+    .filter(u => {
+      if (u.owner === role) return true;
+      const cell = room.map[u.y][u.x];
+      if (cell.terrain === 'forest') return false;
+      return visible.has(u.y + ',' + u.x);
+    })
+    .map(u => ({ id: u.id, owner: u.owner, x: u.x, y: u.y, dir: u.dir, hp: u.hp, acted: u.acted }));
+
+  return {
+    roomId: room.id,
+    mode: room.mode,
+    phase: room.phase,
+    turn: room.turn,
+    winner: room.winner,
+    draw: room.draw,
+    size: SIZE,
+    map: mapOut,
+    units,
+    role,
+    lastEvent: room.lastEvent,
+    drawProposed: room.drawProposed,
+    movesCount: room.movesCount,
+    drawLimit: DRAW_LIMIT
+  };
+}
+
+function broadcast(room) {
+  for (const role of Object.keys(room.players)) {
+    const ws = room.players[role];
+    if (ws) sendTo(ws, { type: 'state', state: publicState(room, role) });
+  }
+}
+
+function checkEnd(room) {
+  if (room.mode === '15v15') {
+    const p1 = room.units.filter(u => u.owner === 'player1').length;
+    const p2 = room.units.filter(u => u.owner === 'player2').length;
+    if (p1 === 0 && p2 === 0) { room.phase = 'over'; room.draw = true; }
+    else if (p1 === 0) { room.phase = 'over'; room.winner = 'player2'; }
+    else if (p2 === 0) { room.phase = 'over'; room.winner = 'player1'; }
+  } else {
+    const d = room.units.filter(u => u.owner === 'defender').length;
+    const a = room.units.filter(u => u.owner === 'attacker').length;
+    if (d === 0) { room.phase = 'over'; room.winner = 'attacker'; }
+    else if (a === 0) { room.phase = 'over'; room.winner = 'defender'; }
+  }
+}
+
+function getOpponent(room, role) {
+  if (room.mode === '15v15') return role === 'player1' ? 'player2' : 'player1';
+  return role === 'defender' ? 'attacker' : 'defender';
+}
+
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
+
+    if (msg.type === 'joinQueue') {
+      const mode = msg.mode;
+      if (!MODES[mode]) return;
+      if (ws.roomId) return;
+      const q = waiting[mode];
+      if (q.length > 0) {
+        const opponent = q.shift();
+        const room = createRoom(mode);
+        const [r1, r2] = room.roles;
+        room.players[r1] = opponent;
+        room.players[r2] = ws;
+        opponent.roomId = room.id; opponent.role = r1;
+        ws.roomId = room.id; ws.role = r2;
+        rooms.set(room.id, room);
+        sendTo(opponent, { type: 'matched', role: r1, roomId: room.id, mode });
+        sendTo(ws, { type: 'matched', role: r2, roomId: room.id, mode });
+        broadcast(room);
+      } else {
+        q.push(ws);
+        sendTo(ws, { type: 'waiting' });
+      }
+      return;
+    }
+
+    if (msg.type === 'cancelQueue') {
+      for (const mode of Object.keys(waiting)) {
+        const i = waiting[mode].indexOf(ws);
+        if (i >= 0) waiting[mode].splice(i, 1);
+      }
+      sendTo(ws, { type: 'queueCancelled' });
+      return;
+    }
+
+    if (msg.type === 'leave') {
+      const room = rooms.get(ws.roomId);
+      if (room) {
+        for (const r of Object.keys(room.players)) {
+          if (room.players[r] && room.players[r] !== ws) {
+            sendTo(room.players[r], { type: 'opponentLeft' });
+          }
+        }
+        rooms.delete(room.id);
+      }
+      ws.roomId = null; ws.role = null;
+      return;
+    }
+
+    const room = rooms.get(ws.roomId);
+    if (!room) return;
+    const role = ws.role;
+
+    if (msg.type === 'action') {
+      if (room.phase !== 'battle') return;
+      if (room.turn !== role) { sendTo(ws, { type: 'error', message: 'Не ваш ход' }); return; }
+      const u = room.units.find(x => x.id === msg.id && x.owner === role);
+      if (!u || u.hp <= 0 || u.acted) { sendTo(ws, { type: 'error', message: 'Боец недоступен' }); return; }
+      applyAction(room, role, u, msg);
+      checkEnd(room);
+      broadcast(room);
+      return;
+    }
+
+    if (msg.type === 'endTurn') {
+      if (room.phase !== 'battle') return;
+      if (room.turn !== role) return;
+      room.movesCount[role] = (room.movesCount[role] || 0) + 1;
+      const totalMoves = Object.values(room.movesCount).reduce((a, b) => a + b, 0);
+      if (room.mode === '15v15' && totalMoves >= DRAW_LIMIT * 2) {
+        room.phase = 'over';
+        room.draw = true;
+      } else {
+        room.turn = getOpponent(room, role);
+        room.units.forEach(x => x.acted = false);
+        room.lastEvent = { kind: 'turnEnded', by: role, at: Date.now() };
+      }
+      broadcast(room);
+      return;
+    }
+
+    if (msg.type === 'proposeDraw') {
+      if (room.phase !== 'battle') return;
+      if (room.mode !== '15v15') return;
+      if (room.drawProposed) return;
+      room.drawProposed = { by: role, at: Date.now() };
+      broadcast(room);
+      return;
+    }
+
+    if (msg.type === 'acceptDraw') {
+      if (room.phase !== 'battle') return;
+      if (room.mode !== '15v15') return;
+      if (!room.drawProposed) return;
+      if (room.drawProposed.by === role) return;
+      room.phase = 'over';
+      room.draw = true;
+      broadcast(room);
+      return;
+    }
+  });
+
+  ws.on('close', () => {
+    for (const mode of Object.keys(waiting)) {
+      const i = waiting[mode].indexOf(ws);
+      if (i >= 0) waiting[mode].splice(i, 1);
+    }
+    const room = rooms.get(ws.roomId);
+    if (room) {
+      for (const r of Object.keys(room.players)) {
+        if (room.players[r] && room.players[r] !== ws) {
+          sendTo(room.players[r], { type: 'opponentLeft' });
+        }
+      }
+      rooms.delete(room.id);
+    }
+  });
+});
+
+function applyAction(room, role, u, a) {
+  if (a.action === 'move') {
+    if (Math.abs(a.dx) + Math.abs(a.dy) !== 1) return;
+    const nx = u.x + a.dx, ny = u.y + a.dy;
+    if (!inside(nx, ny)) return;
+    const cell = room.map[ny][nx];
+    if (cell.terrain === 'river' && !cell.bridge) return;
+    if (room.units.some(o => o.x === nx && o.y === ny && o.hp > 0)) return;
+    u.x = nx; u.y = ny; u.acted = true;
+  } else if (a.action === 'rotate') {
+    if (a.dir < 0 || a.dir > 7) return;
+    if (u.dir === a.dir) return;
+    u.dir = a.dir; u.acted = true;
+  } else if (a.action === 'shoot') {
+    const t = room.units.find(o => o.id === a.targetId && o.owner !== role && o.hp > 0);
+    if (!t) return;
+    if (!canShoot(room, u, t)) return;
+    const p = hitChance(room, u, t);
+    const hit = Math.random() < p;
+    let killed = false;
+    if (hit) {
+      t.hp -= 1;
+      if (t.hp <= 0) { room.units = room.units.filter(o => o.id !== t.id); killed = true; }
+    }
+    u.acted = true;
+    room.lastEvent = {
+      kind: 'shot', by: role,
+      from: { x: u.x, y: u.y }, to: { x: t.x, y: t.y },
+      hit, killed, at: Date.now()
+    };
+  } else if (a.action === 'shootAt') {
+    const x = a.x, y = a.y;
+    if (!inside(x, y)) return;
+    const onHill = room.map[u.y][u.x].terrain === 'hill';
+    const range = SHOOT_RANGE + (onHill ? 2 : 0);
+    const cells = lineCells(room, u, range, onHill);
+    if (!cells.some(c => c.x === x && c.y === y)) return;
+    const t = room.units.find(o => o.x === x && o.y === y && o.owner !== role && o.hp > 0);
+    let hit = false, killed = false;
+    if (t) {
+      let p = hitChance(room, u, t);
+      if (!canShoot(room, u, t)) p *= 0.75;
+      hit = Math.random() < p;
+      if (hit) {
+        t.hp -= 1;
+        if (t.hp <= 0) { room.units = room.units.filter(o => o.id !== t.id); killed = true; }
+      }
+    }
+    u.acted = true;
+    room.lastEvent = {
+      kind: 'shot', by: role,
+      from: { x: u.x, y: u.y }, to: { x, y },
+      hit, killed, blind: true, at: Date.now()
+    };
+  }
+}
+
+function canShoot(room, s, t) {
+  const onHill = room.map[s.y][s.x].terrain === 'hill';
+  const maxR = SHOOT_RANGE + (onHill ? 2 : 0);
+  const v = DIR_VECS[s.dir];
+  const starts = parallelStarts(s, s.dir);
+  for (const st of starts) {
+    for (let k = 0; k < maxR; k++) {
+      const nx = st.x + v.dx * k, ny = st.y + v.dy * k;
+      if (!inside(nx, ny)) break;
+      if (nx === t.x && ny === t.y) return true;
       if (!onHill) {
-        const c = MAP[ny][nx];
-        if (c && (c.terrain === 'forest' || c.terrain === 'hill')) break;
+        const c = room.map[ny][nx];
+        if (c.terrain === 'river' && !c.bridge) break;
+        if (c.terrain === 'forest' || c.terrain === 'hill') break;
+        if (room.units.some(o => o.x === nx && o.y === ny && o.hp > 0 && o.owner === s.owner)) break;
       }
     }
   }
-  return out;
+  return false;
 }
 
-function getMoveCells(u) {
-  const dirs = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
-  const out = [];
-  for (const [dx, dy] of dirs) {
-    const nx = u.x + dx, ny = u.y + dy;
-    if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
-    const c = MAP[ny][nx];
-    if (!c || c.terrain === 'unknown') continue;
-    if (c.terrain === 'river' && !c.bridge) continue;
-    if (state.units.some(o => o.x === nx && o.y === ny && o.hp > 0)) continue;
-    out.push({ x: nx, y: ny });
-  }
-  return out;
+function hitChance(room, s, t) {
+  const dist = Math.max(Math.abs(s.x - t.x), Math.abs(s.y - t.y));
+  const onHill = room.map[s.y][s.x].terrain === 'hill';
+  const maxR = SHOOT_RANGE + (onHill ? 2 : 0);
+  let p = 0.95 - (dist / maxR) * 0.7;
+  if (onHill) p += 0.15;
+  if (room.map[t.y][t.x].terrain === 'forest') p -= 0.25;
+  return Math.max(0.05, Math.min(0.95, p));
 }
 
-function highlightUnit(u) {
-  const moves = getMoveCells(u);
-  ctx.fillStyle = 'rgba(120,255,120,0.35)';
-  moves.forEach(c => ctx.fillRect(c.x * CELL, c.y * CELL, CELL, CELL));
-
-  const shots = getShotCells(u);
-  ctx.fillStyle = aimMode ? 'rgba(255,150,50,0.4)' : 'rgba(180,180,180,0.15)';
-  shots.forEach(c => {
-    if (!moves.some(m => m.x === c.x && m.y === c.y)) {
-      ctx.fillRect(c.x * CELL, c.y * CELL, CELL, CELL);
-    }
-  });
-}
-
-function updateTopBar() {
-  const dot = document.getElementById('turnDot');
-  const info = document.getElementById('turnInfo');
-  if (!state) return;
-  if (state.phase === 'battle') {
-    const myTurn = state.turn === myRole;
-    dot.className = myTurn ? 'blue' : 'red';
-    info.textContent = myTurn ? '🟢 Ваш ход' : '🔴 Ход соперника';
-  } else if (state.phase === 'over') {
-    if (state.draw) {
-      dot.className = 'blue';
-      info.textContent = '🤝 Ничья';
-    } else {
-      dot.className = state.winner === myRole ? 'blue' : 'red';
-      info.textContent = state.winner === myRole ? '🏆 Победа!' : '💀 Поражение';
-    }
-  }
-}
-
-function updateBottomPanel() {
-  const stats = document.getElementById('stats');
-  const toolbar = document.getElementById('toolbar');
-  toolbar.innerHTML = '';
-  if (!state) return;
-
-  const is15 = state.mode === '15v15';
-  const myTurn = state.turn === myRole;
-
-  if (state.phase === 'battle') {
-    const mine = state.units.filter(u => u.owner === myRole);
-    const notMoved = mine.filter(u => !u.acted).length;
-    const enemy = state.units.filter(u => u.owner !== myRole).length;
-    let html = 'Моих бойцов: <b>' + mine.length + '</b><br>Ещё не ходили: <b>' + notMoved + '</b><br>Врагов в обзоре: <b>' + enemy + '</b>';
-    if (is15) {
-      const myMoves = state.movesCount[myRole] || 0;
-      html += '<br>Ходов до ничьей: <b>' + Math.max(0, state.drawLimit - myMoves) + '</b>';
-    }
-    stats.innerHTML = html;
-
-    if (!myTurn) {
-      addBtn(toolbar, '⏳ Ожидание соперника', null, 'waitingBtn wide');
-      return;
-    }
-
-    const row1 = mkRow(toolbar);
-    addBtn(row1, '👥 Выделить всех', () => {
-      selected.clear();
-      mine.forEach(u => { if (!u.acted) selected.add(u.id); });
-      if (selected.size === 0) showToast('Все бойцы уже сходили', 'info');
-      else showToast('Выделено: ' + selected.size + ' бойцов', 'success');
-      render();
-    });
-    addBtn(row1, '✖ Снять', () => { selected.clear(); aimMode = false; render(); });
-
-    const row2 = mkRow(toolbar);
-    addBtn(row2, aimMode ? '🎯 Клик по цели…' : '🎯 Выстрел', () => {
-      if (selected.size === 0) { showToast('Сначала выбери бойца', 'error'); return; }
-      const u = state.units.find(x => selected.has(x.id));
-      if (!u || u.acted) { showToast('Этот боец уже сходил', 'error'); return; }
-      aimMode = !aimMode;
-      if (aimMode) showToast('Клик по врагу или по пустой клетке — выстрел', 'info');
-      render();
-    }, aimMode ? 'primary wide' : 'wide');
-
-    mkLabel(toolbar, 'Повернуть:');
-    const rowDir = mkRow(toolbar);
-    ['↖','↑','↗','→','↘','↓','↙','←'].forEach(s => {
-      const mapD = { '↑':0, '↗':1, '→':2, '↘':3, '↓':4, '↙':5, '←':6, '↖':7 };
-      addBtn(rowDir, s, () => rotateSelected(mapD[s]), 'arrowBtn');
-    });
-
-    if (is15) {
-      const rowDraw = mkRow(toolbar);
-      if (state.drawProposed && state.drawProposed.by !== myRole) {
-        addBtn(rowDraw, '🤝 Принять ничью', () => {
-          ws.send(JSON.stringify({ type: 'acceptDraw' }));
-        }, 'primary wide');
-      } else if (state.drawProposed && state.drawProposed.by === myRole) {
-        addBtn(rowDraw, '⏳ Ждём ответа на ничью…', null, 'waitingBtn wide');
-      } else {
-        addBtn(rowDraw, '🤝 Предложить ничью', () => {
-          ws.send(JSON.stringify({ type: 'proposeDraw' }));
-        }, 'wide');
-      }
-    }
-
-    const rowEnd = mkRow(toolbar);
-    const endBtnText = confirmEndArmed ? '✅ Точно завершить?' : '✅ Завершить ход';
-    const endBtnCls = confirmEndArmed ? 'confirmEnd wide' : 'primary wide';
-    addBtn(rowEnd, endBtnText, () => {
-      const mineU = state.units.filter(u => u.owner === myRole);
-      const notMovedU = mineU.filter(u => !u.acted).length;
-      if (notMovedU > 0 && !confirmEndArmed) {
-        confirmEndArmed = true;
-        showToast('Ещё ' + notMovedU + ' бойцов не ходили. Нажми ещё раз, чтобы завершить', 'info');
-        render();
-        return;
-      }
-      confirmEndArmed = false;
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'endTurn' }));
-      selected.clear(); aimMode = false;
-    }, endBtnCls);
-  }
-
-  if (state.phase === 'over') {
-    stats.textContent = state.draw ? 'Ничья' : (state.winner === myRole ? '🏆 Вы победили!' : '💀 Вы проиграли');
-    const row = mkRow(toolbar);
-    addBtn(row, '🔄 В лобби', () => leaveGame(), 'primary wide');
-  }
-}
-
-function mkRow(parent) {
-  const r = document.createElement('div');
-  r.className = 'row';
-  parent.appendChild(r);
-  return r;
-}
-function mkLabel(parent, text) {
-  const d = document.createElement('div');
-  d.className = 'row label';
-  d.textContent = text;
-  parent.appendChild(d);
-}
-function addBtn(parent, text, fn, cls) {
-  const b = document.createElement('button');
-  b.textContent = text;
-  if (cls) b.className = cls;
-  if (fn) b.onclick = fn;
-  parent.appendChild(b);
-  return b;
-}
-
-function rotateSelected(dir) {
-  if (!state || state.turn !== myRole) return;
-  if (selected.size === 0) { showToast('Сначала выбери бойца', 'error'); return; }
-  let rotated = 0;
-  let alreadyFacing = 0;
-  let blocked = 0;
-  selected.forEach(id => {
-    const u = state.units.find(x => x.id === id);
-    if (!u || u.acted) { blocked++; return; }
-    if (u.dir === dir) { alreadyFacing++; return; }
-    ws.send(JSON.stringify({ type: 'action', action: 'rotate', id, dir }));
-    rotated++;
-  });
-  if (rotated === 0) {
-    if (alreadyFacing > 0) showToast('Боец уже смотрит туда', 'info');
-    else if (blocked > 0) showToast('Эти бойцы уже сходили', 'info');
-    else showToast('Нечего поворачивать', 'info');
-  }
-  render();
-}
-
-function cellFromEvent(e) {
-  const r = canvas.getBoundingClientRect();
-  let cx, cy;
-  if (e.touches && e.touches[0]) { cx = e.touches[0].clientX - r.left; cy = e.touches[0].clientY - r.top; }
-  else if (e.changedTouches && e.changedTouches[0]) { cx = e.changedTouches[0].clientX - r.left; cy = e.changedTouches[0].clientY - r.top; }
-  else { cx = e.clientX - r.left; cy = e.clientY - r.top; }
-  return { x: Math.floor(cx / CELL), y: Math.floor(cy / CELL) };
-}
-
-canvas.addEventListener('mousedown', (e) => {
-  if (!state || state.phase !== 'battle') return;
-  dragStart = cellFromEvent(e); dragEnd = null;
-});
-canvas.addEventListener('mousemove', (e) => {
-  if (dragStart) { dragEnd = cellFromEvent(e); render(); }
-});
-canvas.addEventListener('mouseup', (e) => handlePointerUp(e));
-canvas.addEventListener('touchstart', (e) => {
-  if (!state || state.phase !== 'battle') return;
-  dragStart = cellFromEvent(e); dragEnd = null;
-}, { passive: true });
-canvas.addEventListener('touchmove', (e) => {
-  if (dragStart) { dragEnd = cellFromEvent(e); render(); }
-}, { passive: true });
-canvas.addEventListener('touchend', (e) => handlePointerUp(e), { passive: true });
-
-function handlePointerUp(e) {
-  const c = cellFromEvent(e);
-  const isDrag = dragStart && (Math.abs(c.x - dragStart.x) > 1 || Math.abs(c.y - dragStart.y) > 1);
-  if (isDrag && state && state.phase === 'battle') {
-    const x1 = Math.min(dragStart.x, c.x), y1 = Math.min(dragStart.y, c.y);
-    const x2 = Math.max(dragStart.x, c.x), y2 = Math.max(dragStart.y, c.y);
-    const inRect = state.units.filter(u =>
-      u.owner === myRole && !u.acted &&
-      u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2
-    );
-    selected.clear();
-    inRect.forEach(u => selected.add(u.id));
-    dragStart = dragEnd = null;
-    render();
-    return;
-  }
-  dragStart = dragEnd = null;
-  handleClick(c, !!(e.ctrlKey || e.shiftKey));
-}
-
-function handleClick(c, multi) {
-  if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
-  const clicked = state.units.find(u => u.x === c.x && u.y === c.y);
-
-  if (clicked && clicked.owner === myRole) {
-    if (clicked.acted) {
-      showToast('Этот боец уже сходил', 'info');
-      return;
-    }
-    if (multi) {
-      if (selected.has(clicked.id)) selected.delete(clicked.id);
-      else selected.add(clicked.id);
-    } else {
-      selected.clear();
-      selected.add(clicked.id);
-    }
-    aimMode = false;
-    confirmEndArmed = false;
-    render();
-    return;
-  }
-
-  if (aimMode) {
-    if (selected.size === 0) {
-      aimMode = false;
-      showToast('Сначала выбери бойца', 'error');
-      render();
-      return;
-    }
-    const u = state.units.find(x => selected.has(x.id));
-    if (!u || u.acted) {
-      aimMode = false;
-      showToast('Боец недоступен', 'error');
-      render();
-      return;
-    }
-    if (clicked && clicked.owner !== myRole) {
-      const shots = getShotCells(u);
-      if (!shots.some(s => s.x === clicked.x && s.y === clicked.y)) {
-        showToast('Цель вне зоны стрельбы', 'error');
-        aimMode = false;
-        render();
-        return;
-      }
-      ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
-      aimMode = false;
-      selected.delete(u.id);
-      render();
-      return;
-    }
-    const shots = getShotCells(u);
-    if (shots.some(s => s.x === c.x && s.y === c.y)) {
-      showToast('Выстрел вслепую…', 'info');
-      ws.send(JSON.stringify({ type: 'action', action: 'shootAt', id: u.id, x: c.x, y: c.y }));
-      aimMode = false;
-      selected.delete(u.id);
-      render();
-      return;
-    }
-    showToast('Сюда стрелять нельзя — вне зоны', 'error');
-    aimMode = false;
-    render();
-    return;
-  }
-
-  if (clicked && clicked.owner !== myRole) {
-    showToast('Это враг. Нажми «🎯 Выстрел», потом клик по нему.', 'info');
-    return;
-  }
-
-  if (selected.size === 1) {
-    const u = state.units.find(x => selected.has(x.id));
-    if (!u || u.acted) return;
-    const cell = MAP[c.y] && MAP[c.y][c.x];
-    if (cell && cell.terrain === 'unknown') {
-      showToast('Туда не видно — неизвестная клетка', 'error');
-      return;
-    }
-    if (cell && cell.terrain === 'river' && !cell.bridge) {
-      showToast('Река — туда нельзя без моста', 'error');
-      return;
-    }
-    if (state.units.some(o => o.x === c.x && o.y === c.y && o.hp > 0)) {
-      showToast('Клетка занята', 'error');
-      return;
-    }
-    const moves = getMoveCells(u);
-    if (moves.some(m => m.x === c.x && m.y === c.y)) {
-      const dx = c.x - u.x, dy = c.y - u.y;
-      ws.send(JSON.stringify({ type: 'action', action: 'move', id: u.id, dx, dy }));
-      selected.delete(u.id);
-      render();
-      return;
-    }
-    showToast('Слишком далеко — боец ходит на 1 клетку', 'info');
-    return;
-  }
-
-  selected.clear();
-  aimMode = false;
-  confirmEndArmed = false;
-  render();
-}
-
-document.addEventListener('keydown', (e) => {
-  if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
-  const keyMap = { 'ArrowUp': 0, 'ArrowRight': 2, 'ArrowDown': 4, 'ArrowLeft': 6 };
-  if (e.key in keyMap) {
-    rotateSelected(keyMap[e.key]);
-    e.preventDefault();
-  } else if (e.key === 'Enter') {
-    const mineU = state.units.filter(u => u.owner === myRole);
-    const notMovedU = mineU.filter(u => !u.acted).length;
-    if (notMovedU > 0 && !confirmEndArmed) {
-      confirmEndArmed = true;
-      showToast('Ещё ' + notMovedU + ' бойцов не ходили. Enter ещё раз — завершить', 'info');
-      render();
-      return;
-    }
-    confirmEndArmed = false;
-    ws.send(JSON.stringify({ type: 'endTurn' }));
-    selected.clear(); aimMode = false;
-  } else if (e.key === 'Escape') {
-    selected.clear(); aimMode = false; confirmEndArmed = false;
-    render();
-  }
-});
-
-function toggleHint() {
-  const el = document.getElementById('hintPopup');
-  const content = document.getElementById('hintContent');
-  if (el.classList.contains('show')) { el.classList.remove('show'); return; }
-  if (!state) return;
-  let html = '';
-  if (state.phase === 'battle') {
-    const myTurn = state.turn === myRole;
-    html = myTurn ? '<h3>Ваш ход</h3>' : '<h3>Ход соперника</h3>';
-    html += '<b>Что делать:</b><br>' +
-      '1. Клик по своему бойцу — выделить.<br>' +
-      '2. Клик по зелёной клетке — шаг.<br>' +
-      '3. Кнопки-стрелки — поворот.<br>' +
-      '4. Кнопка «🎯 Выстрел», потом клик по врагу — выстрел.<br>' +
-      '5. «Завершить ход» — передать ход.<br><br>';
-    if (state.mode === '15v15') {
-      html += '<b>Режим 15 vs 15.</b> У обоих туман войны. Ничья — если 100 ходов без победы, или по кнопке.<br><br>';
-    } else {
-      if (myRole === 'defender') {
-        html += '<b>Вы — защитник (сверху, синие).</b> Видите всю карту. У вас 10 бойцов против 20.<br><br>';
-      } else {
-        html += '<b>Вы — атакующий (снизу, красные).</b> Видите только обзор. У вас 20 бойцов против 10.<br><br>';
-      }
-    }
-    html += 'Свои — <b style="color:#4a80d0">синие</b>. Враги — <b style="color:#c44">красные</b> (затемнены).';
-  }
-  content.innerHTML = html;
-  el.classList.add('show');
-}
-
-function showToast(text, type) {
-  const t = document.getElementById('toast');
-  if (!t) return;
-  t.textContent = text;
-  t.className = 'show ' + (type || '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
-}
-
-function showShotToast(text, kind) {
-  const t = document.getElementById('shotToast');
-  const tt = document.getElementById('shotToastText');
-  if (!t || !tt) return;
-  tt.textContent = text;
-  t.className = 'show ' + (kind || '');
-  clearTimeout(shotToastTimer);
-  shotToastTimer = setTimeout(hideShotToast, 3500);
-}
-function hideShotToast() {
-  const t = document.getElementById('shotToast');
-  if (t) t.classList.remove('show');
-}
-
-window.addEventListener('resize', () => { if (state) { resizeCanvas(); render(); } });
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => { if (state) { resizeCanvas(); render(); } }, 200);
-});
+server.listen(PORT, '0.0.0.0', () => console.log('Сервер запущен'));
