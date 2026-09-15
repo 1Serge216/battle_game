@@ -5,373 +5,219 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>War Game</title>
     <style>
-        * { 
-            box-sizing: border-box; 
-            -webkit-tap-highlight-color: transparent; 
-            user-select: none; 
-        }
-        html, body { 
-            margin: 0; 
-            height: 100%; 
-            overscroll-behavior: none; 
-        }
-        body { 
-            background: #14141c; 
-            color: #eee; 
-            font-family: system-ui, -apple-system, sans-serif; 
-            overflow: hidden; 
-            touch-action: manipulation; 
-        }
-        .screen { 
-            position: fixed; 
-            inset: 0; 
-            display: flex; 
-            flex-direction: column; 
-            padding: 16px; 
-            overflow-y: auto; 
-        }
-        .hidden { 
-            display: none !important; 
-        }
-        
-        /* === ЛОББИ И ПРАВИЛА === */
-        #lobby h1, #rules h1 { 
-            text-align: center; 
-            margin: 20px 0; 
-        }
-        #lobby h1 { 
-            font-size: 28px; 
-        }
-        #rules h1 { 
-            font-size: 24px; 
-            margin: 12px 0; 
-        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        html, body { margin: 0; height: 100%; overscroll-behavior: none; }
+        body { background: #14141c; color: #eee; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: manipulation; }
+        .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: 16px; overflow-y: auto; }
+        .hidden { display: none !important; }
+        #lobby h1 { text-align: center; font-size: 28px; margin: 20px 0; }
+        .card { background: #26263a; border-radius: 12px; padding: 18px; margin-bottom: 12px; cursor: pointer; min-height: 60px; }
+        .card:active { background: #3a3a55; }
+        .card h2 { margin: 0 0 6px; font-size: 18px; }
+        .card p { margin: 0; color: #aaa; font-size: 14px; line-height: 1.4; }
+        #rules h1 { text-align: center; font-size: 24px; margin: 12px 0; }
+        .rules-section { background: #26263a; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .rules-section h2 { margin: 0 0 10px; font-size: 18px; color: #6cf; }
+        .rules-section h3 { margin: 14px 0 6px; font-size: 15px; color: #9cf; }
+        .rules-section p, .rules-section li { margin: 4px 0; color: #ddd; font-size: 14px; line-height: 1.5; }
+        .rules-section ul { padding-left: 20px; margin: 6px 0; }
+        .rules-section b { color: #fff; }
 
-        .card { 
-            background: #26263a; 
-            border-radius: 12px; 
-            padding: 18px; 
-            margin-bottom: 12px; 
-            cursor: pointer; 
-            min-height: 60px;
-            transition: background-color 0.1s ease;
-        }
-        .card:hover { 
-            background: #3a3a55; 
-        }
-        .card:active { 
-            background: #3a3a55; 
-        }
-        .card h2 { 
-            margin: 0 0 6px; 
-            font-size: 18px; 
-        }
-        .card p { 
-            margin: 0; 
-            color: #aaa; 
-            font-size: 14px; 
-            line-height: 1.4; 
-        }
+        #gameScreen { display: flex; flex-direction: column; height: 100%; padding: 0; position: relative; }
+        #topPanel { background: #1b1b28; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; }
+        #turnDot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+        #turnDot.blue { background: #4a80d0; box-shadow: 0 0 8px #4a80d0; }
+        #turnDot.red { background: #c44; box-shadow: 0 0 8px #c44; }
+        #turnInfo { font-size: 13px; flex: 1; }
+        #topPanel button { padding: 6px 10px; font-size: 12px; min-height: 32px; min-width: 32px; border-radius: 6px; border: none; background: #3a3a5a; color: #eee; cursor: pointer; flex: 0 0 auto; }
+        #topPanel button:active { background: #4a4a7a; }
+        #infoBtn { border-radius: 50%; width: 32px; height: 32px; padding: 0; font-weight: bold; }
+        #surrenderBtn { background: #6a4a2a; }
+        #leaveBtn { background: #c44; color: #fff; }
 
-        .rules-section { 
-            background: #26263a; 
-            border-radius: 12px; 
-            padding: 16px; 
-            margin-bottom: 12px; 
-        }
-        .rules-section h2 { 
-            margin: 0 0 10px; 
-            font-size: 18px; 
-            color: #6cf; 
-        }
-        .rules-section h3 { 
-            margin: 14px 0 6px; 
-            font-size: 15px; 
-            color: #9cf; 
-        }
-        .rules-section p, .rules-section li { 
-            margin: 4px 0; 
-            color: #ddd; 
-            font-size: 14px; 
-            line-height: 1.5; 
-        }
-        .rules-section ul { 
-            padding-left: 20px; 
-            margin: 6px 0; 
-        }
-        .rules-section b { 
-            color: #fff; 
-        }
+        #controlPanel { background: #1b1b28; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; }
+        #controlPanel .row { display: flex; gap: 6px; }
+        #controlPanel button { padding: 10px 8px; font-size: 14px; border-radius: 8px; border: none; background: #3a3a5a; color: #eee; cursor: pointer; flex: 1; min-height: 42px; font-weight: 500; }
+        #controlPanel button:active { background: #4a4a7a; }
+        #controlPanel button.primary { background: #4a80d0; color: #fff; }
+        #controlPanel button.arrowBtn { padding: 6px; font-size: 18px; min-width: 40px; flex: 1; }
+        #controlPanel button.waitingBtn { background: #555; color: #ccc; opacity: 0.7; }
+        #controlPanel button.confirmEnd { background: #7a5a2a; color: #fff; }
+        #controlPanel button:disabled { opacity: 0.4; }
 
-        /* === ЭКРАН ИГРЫ === */
-        #gameScreen { 
-            display: flex; 
-            flex-direction: column; 
-            height: 100%; 
-            padding: 0; 
-            position: relative; 
-        }
+        #boardWrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; position: relative; padding: 4px; }
+        canvas { display: block; background: #000; border-radius: 6px; max-width: 100%; max-height: 100%; }
 
-        #topPanel { 
-            background: #1b1b28; 
-            padding: 8px 10px; 
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
-            border-bottom: 1px solid #2a2a3a; 
-            flex-shrink: 0; 
-        }
-        #turnDot { 
-            width: 16px; 
-            height: 16px; 
-            border-radius: 50%; 
-            flex-shrink: 0; 
-        }
-        #turnDot.blue { 
-            background: #4a80d0; 
-            box-shadow: 0 0 8px #4a80d0; 
-        }
-        #turnDot.red { 
-            background: #c44; 
-            box-shadow: 0 0 8px #c44; 
-        }
-        #turnInfo { 
-            font-size: 13px; 
-            flex: 1; 
-        }
-        #topPanel button { 
-            padding: 6px 10px; 
-            font-size: 12px; 
-            min-height: 32px; 
-            min-width: 32px; 
-            border-radius: 6px; 
-            border: none; 
-            background: #3a3a5a; 
-            color: #eee; 
-            cursor: pointer; 
-            flex: 0 0 auto;
-        }
-        #topPanel button:active { 
-            background: #4a4a7a; 
-        }
-        #infoBtn { 
-            border-radius: 50%; 
-            width: 32px; 
-            height: 32px; 
-            padding: 0; 
-            font-weight: bold; 
-        }
-        #surrenderBtn { 
-            background: #6a4a2a; 
-        }
-        #leaveBtn { 
-            background: #c44; 
-            color: #fff; 
-        }
+        #hintPopup { position: absolute; top: 0; left: 0; right: 0; max-height: 160px; background: #2a2a3a; padding: 12px; border-radius: 0 0 10px 10px; font-size: 13px; line-height: 1.5; color: #ddd; box-shadow: 0 6px 20px rgba(0,0,0,0.7); z-index: 60; display: none; overflow-y: auto; }
+        #hintPopup.show { display: block; }
+        #hintPopup .close { float: right; cursor: pointer; opacity: 0.6; font-size: 18px; padding: 0 6px; }
+        #hintPopup h3 { margin: 0 0 6px; font-size: 14px; color: #6cf; }
+        #hintPopup b { color: #fff; }
+        #hintPopup .stat { font-size: 14px; margin: 4px 0; }
 
-        #controlPanel { 
-            background: #1b1b28; 
-            padding: 8px 10px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 6px; 
-            border-bottom: 1px solid #2a2a3a; 
-            flex-shrink: 0; 
-        }
-        #controlPanel .row { 
-            display: flex; 
-            gap: 6px; 
-        }
-        #controlPanel button { 
-            padding: 10px 8px; 
-            font-size: 14px; 
-            border-radius: 8px; 
-            border: none; 
-            background: #3a3a5a; 
-            color: #eee; 
-            cursor: pointer; 
-            flex: 1; 
-            min-height: 42px; 
-            font-weight: 500;
-        }
-        #controlPanel button:active { 
-            background: #4a4a7a; 
-        }
-        #controlPanel button.primary { 
-            background: #4a80d0; 
-            color: #fff; 
-        }
-        #controlPanel button.arrowBtn { 
-            padding: 6px; 
-            font-size: 18px; 
-            min-width: 40px; 
-            flex: 1; 
-        }
-        #controlPanel button.waitingBtn { 
-            background: #555; 
-            color: #ccc; 
-            opacity: 0.7; 
-        }
-        #controlPanel button.confirmEnd { 
-            background: #7a5a2a; 
-            color: #fff; 
-        }
-        #controlPanel button:disabled { 
-            opacity: 0.4; 
-        }
+        #shotToast { position: absolute; bottom: 6px; left: 8px; right: 8px; background: #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; display: none; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,0.6); align-items: center; justify-content: space-between; gap: 10px; }
+        #shotToast.show { display: flex; }
+        #shotToast.hit { background: #2a6a2a; }
+        #shotToast.killed { background: #7a2a2a; }
+        #shotToast.miss { background: #555; }
+        #shotToast .close { cursor: pointer; opacity: 0.7; font-size: 16px; padding: 0 6px; }
 
-        #boardWrap { 
-            flex: 1; 
-            display: flex; 
-            justify-content: center; 
-            align-items: flex-start; 
-            overflow: hidden; 
-            position: relative; 
-            padding: 4px; 
-        }
-        canvas { 
-            display: block; 
-            background: #000; 
-            border-radius: 6px; 
-            max-width: 100%; 
-            max-height: 100%; 
-        }
+        #toast { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #444; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 14px; max-width: 80%; display: none; z-index: 150; box-shadow: 0 4px 16px rgba(0,0,0,0.7); }
+        #toast.show { display: block; }
+        #toast.error { background: #c44;}
+        #toast.info { background: #3a5a8a; }
+        #toast.success { background: #2a6a2a; }
 
-        /* === ПОДСКАЗКИ И УВЕДОМЛЕНИЯ === */
-        #hintPopup { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            right: 0; 
-            max-height: 160px; 
-            background: #2a2a3a; 
-            padding: 12px; 
-            border-radius: 0 0 10px 10px; 
-            font-size: 13px; 
-            line-height: 1.5; 
-            color: #ddd; 
-            box-shadow: 0 6px 20px rgba(0,0,0,0.7); 
-            z-index: 60; 
-            display: none; 
-            overflow-y: auto; 
-        }
-        #hintPopup.show { 
-            display: block; 
-        }
-        #hintPopup .close { 
-            float: right; 
-            cursor: pointer; 
-            opacity: 0.6; 
-            font-size: 18px; 
-            padding: 0 6px; 
-        }
-        #hintPopup h3 { 
-            margin: 0 0 6px; 
-            font-size: 14px; 
-            color: #6cf; 
-        }
-        #hintPopup b { 
-            color: #fff; 
-        }
-        #hintPopup .stat { 
-            font-size: 14px; 
-            margin: 4px 0; 
-        }
+        #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
+        #modal.show { display: flex; }
+        #modal .box { background: #2a2a3a; border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8); }
+        #modal .box p { margin: 0 0 16px; font-size: 15px; line-height: 1.4; }
+        #modal .box .actions { display: flex; gap: 8px; }
+        #modal .box button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+        #modal .box button.danger { background: #c44; color: #fff; }
+        #modal .box button.safe { background: #4a80d0; color: #fff; }
+        #modal .box button.cancel { background: #555; color: #eee; }
 
-        #shotToast {
-            position: absolute;
-            bottom: 6px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(30, 30, 40, 0.95);
-            backdrop-filter: blur(4px);
-            color: #fff;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            white-space: nowrap;
-            z-index: 70;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-        }
-        #shotToast.show { 
-            opacity: 1; 
+        @media (max-width: 700px) {
+            #lobby, #rules { padding: 12px; }
+            .card { padding: 14px; }
+            .card h2 { font-size: 16px; }
+            #controlPanel button { font-size: 13px; }
         }
     </style>
 </head>
 <body>
+
 <div id="lobby" class="screen">
-    <h1>War Game</h1>
-    <div id="modeCards"></div>
-    <button id="rulesBtn" style="margin-top: 12px; padding: 12px; width: 100%; background: #26263a; color: #eee; border: none; border-radius: 8px;">Правила игры</button>
+    <h1>⚔️ War Game</h1>
+    <div class="card" onclick="showRules()"><h2>📖 Как играть</h2><p>Правила, суть игры, управление</p></div>
+    <div class="card" onclick="joinQueue('10v20')"><h2>⚔️ Оборона: 10 vs 20</h2><p>Защитник сверху — 10 пехоты + 2 пушки, видит всю карту. Атакующий снизу — 20 пехоты + 3 пушки, в тумане.</p></div>
+    <div class="card" onclick="joinQueue('15v15')"><h2>⚔️ Равный бой: 15 vs 15</h2><p>По 15 бойцов. У обоих туман. Ничья — 100 ходов.</p></div>
+    <div class="card" onclick="joinQueue('capture')"><h2>🚩 Захват территории</h2><p>15×15. 30 ходов на игрока. Побеждает тот, кто контролирует больше пространства.</p></div>
 </div>
 
 <div id="rules" class="screen hidden">
-    <h1>Правила</h1>
+    <h1>📖 Как играть</h1>
+    <div class="card" onclick="hideRules()">← Назад</div>
     <div class="rules-section">
-        <h2>Режимы:</h2>
+        <h2>🎯 Суть игры</h2>
+        <p>Пошаговая тактическая игра. Цель — уничтожить всех бойцов противника.</p>
+        <p>Туман войны, ландшафт, вероятность попадания, пушки.</p>
+        <p><b>Прикол:</b> засады в лесу, обходы по мостам, артиллерия с холмов.</p>
+    </div>
+    <div class="rules-section">
+        <h2>⚔️ Режимы</h2>
+        <h3>10 vs 20 (оборона)</h3>
+        <p>Защитник — 10 пехоты + 2 пушки. Видит всю карту. Расставляет вручную (зелёная зона сверху).</p>
+        <p>Атакующий — 20 пехоты + 3 пушки. Видит только обзор. Авто снизу.</p>
+        <h3>15 vs 15</h3>
+        <p>По 15 пехоты. У обоих туман. 100 ходов — ничья.</p>
+        <h3>Захват территории</h3>
+        <p>Поле 15×15. 30 ходов. Контроль = зона стрельбы + тыл.</p>
+    </div>
+    <div class="rules-section">
+        <h2>🏃 Ход бойца</h2>
         <ul>
-            <li><b>10v20:</b> Защитник расставляет войска вручную. Атакующий получает преимущество в численности.</li>
-            <li><b>15v15:</b> Симметричный бой без артиллерии. Можно предложить ничью после 100 ходов суммарно.</li>
-            <li><b>Захват территории:</b> Побеждает тот, кто контролирует больше клеток к концу лимита ходов.</li>
+            <li><b>Шаг</b> — до 2 клеток (пушка — 1).</li>
+            <li><b>Поворот</b> — 8 направлений.</li>
+            <li><b>Выстрел</b> — в пределах дальности.</li>
         </ul>
     </div>
     <div class="rules-section">
-        <h2>Управление:</h2>
-        <p>Выберите юнита кликом или тапом. Используйте кнопки перемещения и поворота. Стрелять можно по цели или в пустую клетку.</p>
+        <h2>👁 Обзор и стрельба</h2>
+        <p>Обзор и стрельба — по 3 линиям (главная + 2 параллельные).</p>
+        <p><b>Обзор:</b> 9 (с холма 12). <b>Стрельба пехоты:</b> 6 (с холма 8).</p>
+        <p><b>Холм:</b> +2 стрельба, +3 обзор, +15% точность.</p>
     </div>
     <div class="rules-section">
-        <h2>Особенности боя:</h2>
+        <h2>💥 Пушка (10v20)</h2>
         <ul>
-            <li>Пехота стреляет очередями до первого препятствия (лес/холм) или союзника.</li>
-            <li>Холмы дают +2 к дальности стрельбы и +15% к шансу попадания.</li>
-            <li>Артиллерия бьет навесом через любые препятствия с дистанции 5–10 клеток.</li>
-            <li>Взрыв снаряда задевает область 3x3 вокруг точки попадания.</li>
+            <li>Ход — 1 клетка.</li>
+            <li>Стрельба только по главной, 5–8 (с холма до 10).</li>
+            <li>Стреляет вслепую.</li>
+            <li>Перезарядка 1 ход.</li>
+            <li>Точное попадание — 2 жизни.</li>
+            <li>Взрыв 3×3 — 12% шанс по соседям.</li>
+            <li>2 HP — нужно 2 удара, чтобы уничтожить.</li>
         </ul>
     </div>
-    <button id="backFromRules" style="padding: 12px; width: 100%; background: #26263a; color: #eee; border: none; border-radius: 8px;">Назад</button>
+    <div class="rules-section">
+        <h2>🌲 Ландшафт</h2>
+        <ul>
+            <li><b>Река</b> — только через мосты (2×2).</li>
+            <li><b>Лес</b> — скрывает, −25%, блокирует обзор.</li>
+            <li><b>Холм</b> — бонус стоящему.</li>
+        </ul>
+    </div>
+    <div class="rules-section">
+        <h2>❤️ Победа</h2>
+        <p>2 жизни. Победа — уничтожить всех.</p>
+        <p>В 15v15 — ничья через 100 ходов или по кнопке.</p>
+        <p>В захвате — % контроля на 30-м ходу.</p>
+    </div>
+    <div class="rules-section">
+        <h2>🎮 Управление</h2>
+        <ul>
+            <li>Клик по бойцу — выделить.</li>
+            <li>Клик по зелёной клетке — шаг.</li>
+            <li>Стрелки — поворот.</li>
+            <li>«Выстрел» → клик по врагу/клетке.</li>
+            <li>«Завершить ход» → двойное нажатие.</li>
+        </ul>
+    </div>
+</div>
+
+<div id="waitingScreen" class="screen hidden">
+    <h1>🔍 Поиск соперника...</h1>
+    <p style="text-align:center;color:#aaa">Ждём, пока кто-то выберет тот же режим</p>
+    <button onclick="cancelQueue()" style="margin-top:20px;padding:12px 24px;border-radius:8px;border:none;background:#4a80d0;color:#fff;font-size:16px;">Отменить</button>
 </div>
 
 <div id="gameScreen" class="screen hidden">
     <div id="topPanel">
         <div id="turnDot" class="blue"></div>
-        <div id="turnInfo">Ход защитника</div>
-        <button id="infoBtn">i</button>
-        <button id="surrenderBtn">Сдаться</button>
-        <button id="leaveBtn">Покинуть</button>
+        <div id="turnInfo"></div>
+        <button id="infoBtn" onclick="toggleHint()">i</button>
+        <button id="surrenderBtn" onclick="askSurrender()">Сдаться</button>
+        <button id="leaveBtn" onclick="askLeave()">Выйти</button>
+    </div>
+    <div id="controlPanel">
+        <div class="row" id="rowMain"></div>
+        <div class="row" id="rowArrows"></div>
+        <div class="row" id="rowActions"></div>
+        <div class="row" id="rowEnd"></div>
+    </div>
+    <div id="boardWrap">
+        <canvas id="board"></canvas>
     </div>
     
-    <div id="controlPanel">
-        <div class="row">
-            <button id="moveBtn" class="primary">Передвинуть</button>
-            <button id="rotateBtn">Повернуть</button>
-        </div>
-        <div class="row">
-            <button id="shootBtn" class="primary">Стрелять</button>
-            <button id="endTurnBtn">Конец хода</button>
-        </div>
-        <div class="row">
-            <button id="drawBtn" class="waitingBtn">Предложить ничью</button>
-            <button id="acceptDrawBtn" class="confirmEnd hidden">Принять ничью</button>
-        </div>
+    <!-- Подсказка -->
+    <div id="hintPopup" class="hidden">
+        <span class="close" onclick="toggleHint()">✕</span>
+        <div id="hintContent"></div>
     </div>
 
-    <div id="boardWrap">
-        <canvas id="boardCanvas"></canvas>
+    <!-- Тост выстрела -->
+    <div id="shotToast" onclick="hideShotToast()">
+        <span id="shotToastText"></span>
+        <span class="close">✕</span>
     </div>
 
-    <div id="hintPopup">
-        <span class="close" id="closeHint">&times;</span>
-        <h3 id="hintTitle"></h3>
-        <p id="hintText"></p>
-        <div id="hintStats"></div>
-    </div>
-
-    <div id="shotToast"></div>
+    <!-- Общий тост -->
+    <div id="toast"></div>
 </div>
-<script scr="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="game.js"></script>
+
+<!-- Модальное окно (приведено к единому ID actions согласно JS) -->
+<div id="modal" class="hidden">
+    <div class="box">
+        <p id="modalText"></p>
+        <div class="actions" id="modalActions"></div>
+    </div>
+</div>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
 
+Этот HTML-файл теперь является идеальной «оболочкой» для вашего отформатированного game.js. Кнопка информации («i») будет корректно открывать статистику боя, так как все целевые контейнеры (#hintPopup, #hintContent) присутствуют в DOM ровно в одном экземпляре.
