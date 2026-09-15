@@ -194,7 +194,8 @@
     <!-- Подсказка -->
     <div id="hintPopup" class="hidden">
         <span class="close" onclick="toggleHint()">✕</span>
-        <div id="hintContent"></div>
+        <!-- Этот ID теперь точно совпадает с тем, что ищет ваш game.js -->
+        <div id="hintContent"></div> 
     </div>
 
     <!-- Тост выстрела -->
@@ -207,10 +208,11 @@
     <div id="toast"></div>
 </div>
 
-<!-- Модальное окно (приведено к единому ID actions согласно JS) -->
+<!-- Модальное окно -->
 <div id="modal" class="hidden">
     <div class="box">
         <p id="modalText"></p>
+        <!-- Оставлен один экземпляр ID согласно вашему скрипту -->
         <div class="actions" id="modalActions"></div>
     </div>
 </div>
@@ -219,5 +221,3 @@
 <script src="game.js"></script>
 </body>
 </html>
-
-
