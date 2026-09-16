@@ -1732,101 +1732,118 @@
       handleClick(c, !!(e.ctrlKey || e.shiftKey));
     }
 
-function handleClick(c, multi) {
-if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
-const clicked = state.units.find(u => u.x === c.x && u.y === c.y);
-if (clicked && clicked.owner === myRole) {
-if (clicked.acted) {
-showToast('Этот боец уже ходил', 'info');
-return;
+    function handleClick(c, multi) {
+      if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
+      const clicked = state.units.find(u => u.x === c.x && u.y === c.y);
+      if (clicked && clicked.owner === myRole) {
+        if (clicked.acted) {
+          showToast('Этот боец уже ходил', 'info');
+          return;
+        }
+        if (multi) {
+          if (selected.has(clicked.id)) selected.delete(clicked.id);
+          else selected.add(clicked.id);
+        } else {
+          selected.clear();
+// --- Обработка кликов по ячейкам ---
+function onCellClick(c, clicked) {
+    if (confirmEndArmed) {
+        selected.clear();
+        aimMode = false;
+        confirmEndArmed = false;
+        render();
+        return;
+    }
+    
+    // Режим стрельбы
+    if (aimMode) {
+        if (selected.size !== 1) { 
+            aimMode = false; 
+            showToast('Сначала выбери одного', 'error'); 
+            render(); 
+            return; 
+        }
+        
+        const u = state.units.find(x => selected.has(x.id));
+        if (!u || u.acted) { 
+            aimMode = false; 
+            showToast('Боец недоступен', 'error'); 
+            render(); 
+            return; 
+        }
+        
+        const shots = getShotCells(u);
+        if (!shots.some(s => s.x === c.x && s.y === c.y)) { 
+            showToast('Вне зоны стрельбы', 'error'); 
+            aimMode = false; 
+            render(); 
+            return; 
+        }
+        
+        if (u.type === 'cannon') {
+            ws.send(JSON.stringify({ type: 'action', action: 'shootCannon', id: u.id, x: c.x, y: c.y }));
+            aimMode = false; 
+            selected.delete(u.id); 
+            render(); 
+            return;
+        }
+        
+        if (clicked && clicked.owner !== myRole) {
+            ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
+        } else {
+            ws.send(JSON.stringify({ type: 'action', action: 'shootAt', id: u.id, x: c.x, y: c.y }));
+        }
+        
+        aimMode = false; 
+        selected.delete(u.id); 
+        render();
+        return;
+    }
+    
+    // Клик по вражеской юните вне режима стрельбы
+    if (clicked && clicked.owner !== myRole) { 
+        showToast('Это враг. Нажми «🎯 Выстрел»', 'info'); 
+        return; 
+    }
+    
+    // Перемещение выбранного бойца
+    if (selected.size === 1) {
+        const u = state.units.find(x => selected.has(x.id));
+        if (!u || u.acted) return;
+        
+        const cell = MAP[c.y] && MAP[c.y][c.x];
+        if (cell && cell.terrain === 'unknown') { 
+            showToast('Туда не видно', 'error'); 
+            return; 
+        }
+        if (cell && cell.terrain === 'river' && !cell.bridge) { 
+            showToast('Река без моста', 'error'); 
+            return; 
+        }
+        if (state.units.some(o => o.x === c.x && o.y === c.y && o.hp > 0)) { 
+            showToast('Клетка занята', 'error'); 
+            return; 
+        }
+        
+        const moves = getMoveCells(u);
+        if (moves.some(m => m.x === c.x && m.y === c.y)) {
+            const dx = c.x - u.x, dy = c.y - u.y;
+            ws.send(JSON.stringify({ type: 'action', action: 'move', id: u.id, dx, dy }));
+            selected.delete(u.id); 
+            render(); 
+            return;
+        }
+        
+        showToast(u.type === 'cannon' ? 'Пушка ходит на 1 клетку' : 'Слишком далеко', 'info');
+        return;
+    }
+    
+    // Сброс выделения и режимов
+    selected.clear(); 
+    aimMode = false; 
+    confirmEndArmed = false;
+    render();
 }
-if (multi) {
-if (selected.has(clicked.id)) selected.delete(clicked.id);
-else selected.add(clicked.id);
-} else {
-selected.clear();
-selected.add(clicked.id);
-}
-aimMode = false;
-confirmEndArmed = false;
-render();
-return;
-}
-if (aimMode) {
-if (selected.size !== 1) {
-aimMode = false;
-showToast('Сначала выбери одного', 'error');
-render();
-return;
-}
-const u = state.units.find(x => selected.has(x.id));
-if (!u || u.acted) {
-aimMode = false;
-showToast('Боец недоступен', 'error');
-render();
-return;
-}
-const shots = getShotCells(u);
-if (!shots.some(s => s.x === c.x && s.y === c.y)) {
-showToast('Вне зоны стрельбы', 'error');
-aimMode = false;
-render();
-return;
-}
-if (u.type === 'cannon') {
-ws.send(JSON.stringify({ type: 'action', action: 'shootCannon', id: u.id, x: c.x, y: c.y }));
-aimMode = false;
-selected.delete(u.id);
-render();
-return;
-}
-if (clicked && clicked.owner !== myRole) {
-ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
-} else {
-ws.send(JSON.stringify({ type: 'action', action: 'shootAt', id: u.id, x: c.x, y: c.y }));
-}
-aimMode = false;
-selected.delete(u.id);
-render();
-return;
-}
-if (clicked && clicked.owner !== myRole) {
-showToast('Это враг. Нажми «🎯 Выстрел»', 'info');
-return;
-}
-if (selected.size === 1) {
-const u = state.units.find(x => selected.has(x.id));
-if (!u || u.acted) return;
-const cell = MAP[c.y] && MAP[c.y][c.x];
-if (cell && cell.terrain === 'unknown') {
-showToast('Туда не видно', 'error');
-return;
-}
-if (cell && cell.terrain === 'river' && !cell.bridge) {
-showToast('Река без моста', 'error');
-return;
-}
-if (state.units.some(o => o.x === c.x && o.y === c.y && o.hp > 0)) {
-showToast('Клетка занята', 'error');
-return;
-}
-const moves = getMoveCells(u);
-if (moves.some(m => m.x === c.x && m.y === c.y)) {
-const dx = c.x - u.x, dy = c.y - u.y;
-ws.send(JSON.stringify({ type: 'action', action: 'move', id: u.id, dx, dy }));
-selected.delete(u.id);
-render();
-return;
-}
-showToast(u.type === 'cannon' ? 'Пушка ходит на 1 клетку' : 'Слишком далеко', 'info');
-return;
-}
-selected.clear();
-aimMode = false;
-confirmEndArmed = false;
-render();
-}
-
 
 // --- Управление с клавиатуры ---
 document.addEventListener('keydown', (e) => {
