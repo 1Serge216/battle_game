@@ -1,14 +1,3 @@
-Так как файл не был прикреплен к сообщению, я выполнил форматирование и исправление ошибок непосредственно по предоставленному тексту.
-
-В процессе анализа были выявлены следующие проблемы:
-
-Синтаксическая ошибка в JavaScript: В функциях getInfantryShotCells и getCannonShotCells отсутствовали логические операторы (например, вместо nx < 0 || ny < 0 было написано nx < 0 ny < 0), что делало код неработоспособным.
-Опечатка в функции: Вызов functionhideToast() написан слитно, из-за чего функция никогда бы не вызвалась.
-Отступы: Весь HTML-код шел сплошным текстом без иерархии вложенности.
-Структура <head>: Тег <style> находился внутри строки с атрибутами тега <head>, а не после него.
-
-Ниже представлен итоговый отформатированный код. Он разбит на логические блоки с правильными отступами, а ошибки в JS-логике стрельбы исправлены.
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1110,54 +1099,375 @@
 
     function handleClick(c, multi) {
       if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
+      
       const clicked = state.units.find(u => u.x === c.x && u.y === c.y);
+      
+      // Клик по своему бойцу (выделение)
       if (clicked && clicked.owner === myRole) {
-        if (clicked.acted) { showToast('Этот боец уже ходил', 'info'); return; }
+        if (clicked.acted) { 
+          showToast('Этот боец уже ходил', 'info'); 
+          return; 
+        }
         if (multi) {
           if (selected.has(clicked.id)) selected.delete(clicked.id);
           else selected.add(clicked.id);
-        } else { selected.clear(); selected.add(clicked.id); }
-        aimMode = false; confirmEndArmed = false;
+        } else { 
+          selected.clear(); 
+          selected.add(clicked.id); 
+        }
+        aimMode = false; 
+        confirmEndArmed = false;
         render();
         return;
       }
+
+      // Режим прицеливания (стрельбы)
       if (aimMode) {
-        if (selected.size !== 1) { aimMode = false; showToast('Сначала выбери одного', 'error'); render(); return; }
+        if (selected.size !== 1) { 
+          aimMode = false; 
+          showToast('Сначала выбери одного', 'error'); 
+          render(); 
+          return; 
+        }
+        
         const u = state.units.find(x => selected.has(x.id));
-        if (!u || u.acted) { aimMode = false; showToast('Боец недоступен', 'error'); render(); return; }
+        if (!u || u.acted) { 
+          aimMode = false; 
+          showToast('Боец недоступен', 'error'); 
+          render(); 
+          return; 
+        }
+        
         const shots = getShotCells(u);
-        if (!shots.some(s => s.x === c.x && s.y === c.y)) { showToast('Вне зоны стрельбы', 'error'); aimMode = false; render(); return; }
+        if (!shots.some(s => s.x === c.x && s.y === c.y)) { 
+          showToast('Вне зоны стрельбы', 'error'); 
+          aimMode = false; 
+          render(); 
+          return; 
+        }
+
         if (u.type === 'cannon') {
           ws.send(JSON.stringify({ type: 'action', action: 'shootCannon', id: u.id, x: c.x, y: c.y }));
-          aimMode = false; selected.delete(u.id); render(); return;
+          aimMode = false; 
+          selected.delete(u.id); 
+          render(); 
+          return;
         }
+
         if (clicked && clicked.owner !== myRole) {
           ws.send(JSON.stringify({ type: 'action', action: 'shoot', id: u.id, targetId: clicked.id }));
         } else {
           ws.send(JSON.stringify({ type: 'action', action: 'shootAt', id: u.id, x: c.x, y: c.y }));
         }
-        aimMode = false; selected.delete(u.id); render();
+        
+        aimMode = false; 
+        selected.delete(u.id); 
+        render();
         return;
       }
-      if (clicked && clicked.owner !== myRole) { showToast('Это враг. Нажми «🎯 Выстрел»', 'info'); return; }
+
+      // Попытка выстрела без режима прицеливания
+      if (clicked && clicked.owner !== myRole) { 
+        showToast('Это враг. Нажми «🎯 Выстрел»', 'info'); 
+        return; 
+      }
+
+      // Движение выбранного юнита
       if (selected.size === 1) {
         const u = state.units.find(x => selected.has(x.id));
         if (!u || u.acted) return;
+        
         const cell = MAP[c.y] && MAP[c.y][c.x];
-        if (cell && cell.terrain === 'unknown') { showToast('Туда не видно', 'error'); return; }
-        if (cell && cell.terrain === 'river' && !cell.bridge) { showToast('Река без моста', 'error'); return; }
-        if (state.units.some(o => o.x === c.x && o.y === c.y && o.hp > 0)) { showToast('Клетка занята', 'error'); return; }
+        if (cell && cell.terrain === 'unknown') { 
+          showToast('Туда не видно', 'error'); 
+          return; 
+        }
+        if (cell && cell.terrain === 'river' && !cell.bridge) { 
+          showToast('Река без моста', 'error'); 
+          return; 
+        }
+        if (state.units.some(o => o.x === c.x && o.y === c.y && o.hp > 0)) { 
+          showToast('Клетка занята', 'error'); 
+          return; 
+        }
+        
         const moves = getMoveCells(u);
         if (moves.some(m => m.x === c.x && m.y === c.y)) {
           const dx = c.x - u.x, dy = c.y - u.y;
           ws.send(JSON.stringify({ type: 'action', action: 'move', id: u.id, dx, dy }));
-          selected.delete(u.id); render(); return;
+          selected.delete(u.id); 
+          render(); 
+          return;
         }
+        
         showToast(u.type === 'cannon' ? 'Пушка ходит на 1 клетку' : 'Слишком далеко', 'info');
         return;
       }
-      selected.clear(); aimMode = false; confirmEndArmed = false;
+
+      // Сброс выделения если кликнули в пустоту
+      selected.clear(); 
+      aimMode = false; 
+      confirmEndArmed = false;
       render();
     }
 
-    document.addEvent
+    document.addEventListener('keydown', (e) => {
+      if (!state || state.phase !== 'battle' || state.turn !== myRole) return;
+      
+      const keyMap = { 'ArrowUp': 0, 'ArrowRight': 2, 'ArrowDown': 4, 'ArrowLeft': 6 };
+      
+      if (e.key in keyMap) { 
+        rotateSelected(keyMap[e.key]); 
+        e.preventDefault(); 
+      }
+      else if (e.key === 'Enter') {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'endTurn' }));
+        selected.clear(); 
+        aimMode = false;
+      } 
+      else if (e.key === 'Escape') {
+        selected.clear(); 
+        aimMode = false; 
+        confirmEndArmed = false;
+        hideHint();
+        render();
+      }
+    });
+
+    function updateHintContent() {
+      if (!state) return;
+      
+      const mine = state.units.filter(u => u.owner === myRole);
+      const notMoved = mine.filter(u => !u.acted).length;
+      const enemy = state.units.filter(u => u.owner !== myRole).length;
+
+      const isDefender = myRole === 'defender' || myRole === 'player1';
+      const circle = document.getElementById('hintHeaderCircle');
+      const text = document.getElementById('hintHeaderText');
+      
+      if (state.mode === '10v20') {
+        circle.className = myRole === 'defender' ? 'blue' : 'red';
+        text.textContent = myRole === 'defender' ? 'Защитники' : 'Атакующие';
+      } else {
+        circle.className = isDefender ? 'blue' : 'red';
+        text.textContent = isDefender ? 'Защитники' : 'Атакующие';
+      }
+
+      const items = [];
+      items.push(['Моих бойцов', mine.length]);
+      items.push(['Не сходили', notMoved]);
+      items.push(['Врагов', enemy]);
+      
+      if (state.mode === '10v20') {
+        items.push(['Роль', myRole === 'defender' ? 'Защитник' : 'Атакующий']);
+      }
+      
+      if (state.mode === '15v15' && state.drawLimit) {
+        const mv = state.movesCount[myRole] || 0;
+        items.push(['Ходов до ничьей', Math.max(0, state.drawLimit - mv)]);
+      }
+      
+      if (state.mode === 'capture') {
+        if (state.turnLimit) items.push(['Ход', state.turnNumber + '/' + (state.turnLimit * 2)]);
+        if (state.territory) {
+          items.push(['Контроль мой', state.territory.me + '%']);
+          items.push(['Контроль враг', state.territory.enemy + '%']);
+        }
+      }
+
+      const grid = document.getElementById('hintGrid');
+      grid.innerHTML = '';
+      
+      items.forEach(([k, v]) => {
+        const d = document.createElement('div');
+        d.className = 'hintItem';
+        d.innerHTML = '<span>' + k + '</span><span>' + v + '</span>';
+        grid.appendChild(d);
+      });
+    }
+
+    function toggleHint() {
+      const el = document.getElementById('hintPopup');
+      if (el.classList.contains('show')) { 
+        hideHint(); 
+        return; 
+      }
+      if (!state) return;
+      
+      updateHintContent();
+      el.classList.add('show');
+    }
+    
+    function hideHint() { 
+      document.getElementById('hintPopup').classList.remove('show'); 
+    }
+    
+    document.getElementById('hintCloseBtn').onclick = hideHint;
+
+    function showToast(text, kind) {
+      const t = document.getElementById('toast');
+      const tt = document.getElementById('toastText');
+      if (!t || !tt) return;
+      
+      tt.textContent = text;
+      t.className = 'show ' + (kind || '');
+      
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { 
+        t.classList.remove('show'); 
+      }, TOAST_TIMEOUT);
+    }
+    
+    function hideToast() { 
+      const t = document.getElementById('toast'); 
+      if (t) t.classList.remove('show'); 
+    }
+    
+    document.getElementById('toastClose').onclick = hideToast;
+
+    function showModal(text, actions) {
+      const modal = document.getElementById('modal');
+      document.getElementById('modalText').textContent = text;
+      const acts = document.getElementById('modalActions');
+      acts.innerHTML = '';
+      
+      actions.forEach(a => {
+        const b = document.createElement('button');
+        b.textContent = a.text;
+        b.className = a.cls || 'cancel';
+        b.onclick = a.action;
+        acts.appendChild(b);
+      });
+      
+      modal.classList.add('show');
+    }
+    
+    function hideModal() { 
+      document.getElementById('modal').classList.remove('show'); 
+    }
+
+    function askLeave() {
+      const isSaved = state && state.saved;
+      if (isSaved) {
+        showModal('Выйти? Партия сохранена, можно вернуться через «Продолжить партию».', [
+          { text: 'Выйти', cls: 'safe', action: () => {
+            hideModal();
+            leaveToLobby();
+          }},
+          { text: 'Остаться', cls: 'cancel', action: hideModal }
+        ]);
+      } else {
+        showModal('Точно выйти? Партия будет удалена.', [
+          { text: 'Выйти', cls: 'danger', action: () => {
+            hideModal();
+            leaveToLobby();
+          }},
+          { text: 'Остаться', cls: 'safe', action: hideModal }
+        ]);
+      }
+    }
+    
+    function askSurrender() {
+      showModal('Точно сдаться? Вы проиграете партию.', [
+        { text: 'Сдаться', cls: 'danger', action: () => {
+          hideModal();
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'surrender' }));
+          state = null; selected.clear(); aimMode = false;
+          confirmEndArmed = false; setupUnits = [];
+          hideHint();
+          showScreen('lobby');
+        }},
+        { text: 'Продолжить', cls: 'safe', action: hideModal }
+      ]);
+    }
+
+    function openPasswordModal(title, subtitle, onOk) {
+      const m = document.getElementById('passwordModal');
+      document.getElementById('pwTitle').textContent = title;
+      document.getElementById('pwSubtitle').textContent = subtitle;
+      const input = document.getElementById('pwInput');
+      input.value = '';
+      passwordAction = onOk;
+      m.classList.add('show');
+      setTimeout(() => input.focus(), 100);
+    }
+    
+    function closePasswordModal() {
+      document.getElementById('passwordModal').classList.remove('show');
+      passwordAction = null;
+    }
+    
+    document.getElementById('pwCancel').onclick = closePasswordModal;
+    
+    document.getElementById('pwConfirm').onclick = () => {
+      const val = document.getElementById('pwInput').value.trim();
+      const fn = passwordAction;
+      closePasswordModal();
+      if (fn) fn(val);
+    };
+    
+    document.getElementById('pwInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('pwConfirm').click();
+      }
+    });
+
+    document.getElementById('infoBtn').addEventListener('click', toggleHint);
+    document.getElementById('surrenderBtn').addEventListener('click', askSurrender);
+    document.getElementById('leaveBtn').addEventListener('click', askLeave);
+
+    function animateBullet() {
+      if (!bulletAnim) return;
+      const t = (performance.now() - bulletAnim.start) / bulletAnim.dur;
+      if (t >= 1) { 
+        bulletAnim = null; 
+        render(); 
+        return; 
+      }
+      render();
+      requestAnimationFrame(animateBullet);
+    }
+    
+    function animateExplosion() {
+      if (!explosionAnim) return;
+      const t = (performance.now() - explosionAnim.start) / explosionAnim.dur;
+      if (t >= 1) { 
+        explosionAnim = null; 
+        render(); 
+        return; 
+      }
+      render();
+      requestAnimationFrame(animateExplosion);
+    }
+
+    window.addEventListener('resize', () => { 
+      if (state) { 
+        resizeCanvas(); 
+        render(); 
+      } 
+    });
+    
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => { 
+        if (state) { 
+          resizeCanvas(); 
+          render(); 
+        } 
+      }, 200);
+    });
+
+    if (window.ResizeObserver) {
+      const wrap = document.getElementById('boardWrap');
+      if (wrap) {
+        const ro = new ResizeObserver(() => {
+          if (state) { 
+            resizeCanvas(); 
+            render(); 
+          }
+        });
+        ro.observe(wrap);
+      }
+    }
+  </script>
+</body>
+</html>
