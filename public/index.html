@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+f<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -823,7 +823,6 @@
           if (nx < 0 || ny < 0 || nx >= N || ny >= N) break;
           const c = MAP[ny][nx];
           if (!c || c.terrain === 'unknown') break;
-          if (c.terrain === 'river' && !c.bridge) break;
           if (state.units.some(o => o.x === nx && o.y === ny && o.hp > 0)) break;
           out.push({ x: nx, y: ny });
         }
