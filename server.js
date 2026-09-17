@@ -986,7 +986,6 @@ function canShootInfantry(room, s, t) {
       if (nx === t.x && ny === t.y) return true;
       if (!onHill) {
         const c = room.map[ny][nx];
-        if (c.terrain === 'river' && !c.bridge) break;
         if (c.terrain === 'forest' || c.terrain === 'hill') break;
         if (room.units.some(o => o.x === nx && o.y === ny && o.hp > 0 && o.owner === s.owner && o.id !== s.id)) break;
       }
