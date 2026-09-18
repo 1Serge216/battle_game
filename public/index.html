@@ -1,63 +1,310 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>War Game</title>
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-    html, body { margin: 0; height: 100%; overscroll-behavior: none; }
-    body { background: #14141c; color: #eee; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: manipulation; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
 
-    .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: 16px; overflow-y: auto; }
-    .hidden { display: none !important; }
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overscroll-behavior: none;
+    }
 
-    #lobby h1, #modeSelect h1, #rules h1 { text-align: center; font-size: 26px; margin: 18px 0; }
-    .card { background: #26263a; border-radius: 12px; padding: 18px; margin-bottom: 12px; cursor: pointer; min-height: 60px; }
-    .card:active { background: #3a3a55; }
-    .card h2 { margin: 0 0 6px; font-size: 18px; }
-    .card p { margin: 0; color: #aaa; font-size: 14px; line-height: 1.4; }
-    .card.resume { background: #2a3a4a; border: 1px solid #3a5a7a; }
-    .card.resume h2 { color: #6cf; }
+    body {
+      background: #14141c;
+      color: #eee;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
 
-    .rules-section { background: #26263a; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-    .rules-section h2 { margin: 0 0 10px; font-size: 18px; color: #6cf; }
-    .rules-section h3 { margin: 14px 0 6px; font-size: 15px; color: #9cf; }
-    .rules-section p, .rules-section li { margin: 4px 0; color: #ddd; font-size: 14px; line-height: 1.5; }
-    .rules-section ul { padding-left: 20px; margin: 6px 0; }
-    .rules-section b { color: #fff; }
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #lobby h1,
+    #modeSelect h1,
+    #rules h1 {
+      text-align: center;
+      font-size: 26px;
+      margin: 18px 0;
+    }
+
+    .card {
+      background: #26263a;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      min-height: 60px;
+    }
+
+    .card:active {
+      background: #3a3a55;
+    }
+
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 0;
+      color: #aaa;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .card.resume {
+      background: #2a3a4a;
+      border: 1px solid #3a5a7a;
+    }
+
+    .card.resume h2 {
+      color: #6cf;
+    }
+
+    .rules-section {
+      background: #26263a;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .rules-section h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: #6cf;
+    }
+
+    .rules-section h3 {
+      margin: 14px 0 6px;
+      font-size: 15px;
+      color: #9cf;
+    }
+
+    .rules-section p,
+    .rules-section li {
+      margin: 4px 0;
+      color: #ddd;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .rules-section ul {
+      padding-left: 20px;
+      margin: 6px 0;
+    }
+
+    .rules-section b {
+      color: #fff;
+    }
 
     /* ==== ИГРОВОЙ ЭКРАН ==== */
-    #gameScreen { display: flex; flex-direction: column; height: 100%; padding: 0; position: relative; overflow: hidden; }
-    #sidePanel { display: flex; flex-direction: column; flex-shrink: 0; }
-    #boardArea { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+    #gameScreen {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+    }
 
-    #topPanel { background: #1b1b28; padding: 6px 8px; display: flex; align-items: center; gap: 5px; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; flex-wrap: wrap; }
-    #turnDot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
-    #turnInfo { font-size: 11px; flex: 1; min-width: 0; }
-    #mySideInfo { font-size: 10px; color: #aaa; flex-basis: 100%; padding-left: 18px; }
-    #topPanel button { padding: 4px 7px; font-size: 10px; min-height: 26px; border-radius: 5px; border: none; background: #3a3a5a; color: #eee; cursor: pointer; flex: 0 0 auto; font-weight: 500; }
-    #topPanel button:active { background: #4a4a7a; }
-    #infoBtn { border-radius: 50%; width: 26px; height: 26px; padding: 0; font-weight: bold; }
-    #surrenderBtn { background: #6a4a2a; }
-    #leaveBtn { background: #c44; color: #fff; }
+    #sidePanel {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
 
-    #controlPanel { background: #1b1b28; padding: 5px 7px; display: flex; flex-direction: column; gap: 3px; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; }
-    #controlPanel .row { display: flex; gap: 4px; flex-wrap: wrap; }
-    #controlPanel button { padding: 7px 5px; font-size: 11px; border-radius: 6px; border: none; background: #3a3a5a; color: #eee; cursor: pointer; flex: 1; min-height: 34px; font-weight: 500; touch-action: manipulation; }
-    #controlPanel button:active { background: #4a4a7a; }
-    #controlPanel button.primary { background: #4a80d0; color: #fff; }
-    #controlPanel button.primary:active { background: #5a90e0; }
-    #controlPanel button.arrowBtn { padding: 4px; font-size: 16px; min-width: 30px; flex: 1; }
-    #controlPanel button.waitingBtn { background: #555; color: #ccc; opacity: 0.7; }
-    #controlPanel button.confirmEnd { background: #7a5a2a; color: #fff; }
-    #controlPanel button:disabled { opacity: 0.4; cursor: default; }
-    #controlPanel .infoLine { width: 100%; text-align: center; font-size: 11px; color: #ccc; padding: 2px; }
+    #boardArea {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+    }
 
-    #boardWrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; position: relative; padding: 4px; min-height: 0; }
-    #boardWrap.waiting { padding-top: 28px; }
-    canvas { display: block; background: #000; border-radius: 6px; max-width: 100%; max-height: 100%; }
+    #topPanel {
+      background: #1b1b28;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    #turnDot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #turnInfo {
+      font-size: 11px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    #mySideInfo {
+      font-size: 10px;
+      color: #aaa;
+      flex-basis: 100%;
+      padding-left: 18px;
+    }
+
+    #topPanel button {
+      padding: 4px 7px;
+      font-size: 10px;
+      min-height: 26px;
+      border-radius: 5px;
+      border: none;
+      background: #3a3a5a;
+      color: #eee;
+      cursor: pointer;
+      flex: 0 0 auto;
+      font-weight: 500;
+    }
+
+    #topPanel button:active {
+      background: #4a4a7a;
+    }
+
+    #infoBtn {
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      font-weight: bold;
+    }
+
+    #surrenderBtn {
+      background: #6a4a2a;
+    }
+
+    #leaveBtn {
+      background: #c44;
+      color: #fff;
+    }
+
+    #controlPanel {
+      background: #1b1b28;
+      padding: 5px 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+    }
+
+    #controlPanel .row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    #controlPanel button {
+      padding: 7px 5px;
+      font-size: 11px;
+      border-radius: 6px;
+      border: none;
+      background: #3a3a5a;
+      color: #eee;
+      cursor: pointer;
+      flex: 1;
+      min-height: 34px;
+      font-weight: 500;
+      touch-action: manipulation;
+    }
+
+    #controlPanel button:active {
+      background: #4a4a7a;
+    }
+
+    #controlPanel button.primary {
+      background: #4a80d0;
+      color: #fff;
+    }
+
+    #controlPanel button.primary:active {
+      background: #5a90e0;
+    }
+
+    #controlPanel button.arrowBtn {
+      padding: 4px;
+      font-size: 16px;
+      min-width: 30px;
+      flex: 1;
+    }
+
+    #controlPanel button.waitingBtn {
+      background: #555;
+      color: #ccc;
+      opacity: 0.7;
+    }
+
+    #controlPanel button.confirmEnd {
+      background: #7a5a2a;
+      color: #fff;
+    }
+
+    #controlPanel button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    #controlPanel .infoLine {
+      width: 100%;
+      text-align: center;
+      font-size: 11px;
+      color: #ccc;
+      padding: 2px;
+    }
+
+    #boardWrap {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow: hidden;
+      position: relative;
+      padding: 4px;
+      min-height: 0;
+    }
+
+    #boardWrap.waiting {
+      padding-top: 28px;
+    }
+
+    canvas {
+      display: block;
+      background: #000;
+      border-radius: 6px;
+      max-width: 100%;
+      max-height: 100%;
+    }
 
     #bottomBar {
       flex-shrink: 0;
@@ -69,31 +316,88 @@
       align-items: center;
       min-height: 30px;
     }
-    #toast { display: none; flex: 1; padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 500; background: #333; color: #fff; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden; white-space: nowrap; }
-    #toast.show { display: flex; }
-    #toast.hit { background: #2a6a2a; }
-    #toast.killed { background: #7a2a2a; }
-    #toast.miss { background: #555; }
-    #toast.error { background: #c44; }
-    #toast.info { background: #3a5a8a; }
-    #toast.warn { background: #7a5a2a; }
-    #toast #toastText { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-    #toast .close { cursor: pointer; opacity: 0.95; font-size: 13px; padding: 0 4px; flex-shrink: 0; color: #f66; font-weight: bold; }
+
+    #toast {
+      display: none;
+      flex: 1;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #333;
+      color: #fff;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    #toast.show {
+      display: flex;
+    }
+
+    #toast.hit {
+      background: #2a6a2a;
+    }
+
+    #toast.killed {
+      background: #7a2a2a;
+    }
+
+    #toast.miss {
+      background: #555;
+    }
+
+    #toast.error {
+      background: #c44;
+    }
+
+    #toast.info {
+      background: #3a5a8a;
+    }
+
+    #toast.warn {
+      background: #7a5a2a;
+    }
+
+    #toast #toastText {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #toast .close {
+      cursor: pointer;
+      opacity: 0.95;
+      font-size: 13px;
+      padding: 0 4px;
+      flex-shrink: 0;
+      color: #f66;
+      font-weight: bold;
+    }
 
     #hintPopup {
       position: absolute;
-      top: 0; left: 0; right: 0;
+      top: 0;
+      left: 0;
+      right: 0;
       background: #2a2a3a;
       padding: 10px 12px;
       border-radius: 0 0 12px 12px;
-      font-size: 12px; line-height: 1.3;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+      font-size: 12px;
+      line-height: 1.3;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
       z-index: 60;
       display: none;
       max-height: 260px;
       overflow-y: auto;
     }
-    #hintPopup.show { display: block; }
+
+    #hintPopup.show {
+      display: block;
+    }
+
     #hintHeader {
       display: flex;
       align-items: center;
@@ -104,65 +408,245 @@
       padding-right: 40px;
       position: relative;
     }
-    #hintHeaderCircle { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-    #hintHeaderText { color: #fff; font-weight: 600; font-size: 14px; }
+
+    #hintHeaderCircle {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #hintHeaderText {
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
     #hintCloseBtn {
       position: absolute;
-      top: -4px; right: 0;
-      width: 28px; height: 28px;
+      top: -4px;
+      right: 0;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       background: #3a3a5a;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       color: #f66;
       font-size: 15px;
       font-weight: bold;
     }
-    #hintCloseBtn:active { background: #4a4a7a; }
+
+    #hintCloseBtn:active {
+      background: #4a4a7a;
+    }
+
     #hintGrid {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 4px 8px;
       align-items: center;
     }
+
     .hintItem {
       display: contents;
     }
-    .hintItem .hk { color: #bbb; font-size: 12px; }
-    .hintItem .hv { color: #fff; font-weight: 700; font-size: 12px; text-align: right; padding-left: 4px; }
-    .hintSection { grid-column: 1 / -1; color: #9cf; font-size: 11px; font-weight: 600; margin-top: 6px; padding-top: 6px; border-top: 1px solid #3a3a5a; }
-    .hintSection:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
-    #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.78); display: none; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
-    #modal.show { display: flex; }
-    #modal .box { background: #2a2a3a; border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.9); }
-    #modal .box p { margin: 0 0 16px; font-size: 15px; line-height: 1.4; color: #eee; }
-    #modal .box .actions { display: flex; gap: 8px; }
-    #modal .box button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
-    #modal .box button.danger { background: #c44; color: #fff; }
-    #modal .box button.safe { background: #4a80d0; color: #fff; }
-    #modal .box button.cancel { background: #555; color: #eee; }
+    .hintItem .hk {
+      color: #bbb;
+      font-size: 12px;
+    }
 
-    #passwordModal { position: fixed; inset: 0; background: rgba(0,0,0,0.78); display: none; align-items: center; justify-content: center; z-index: 210; padding: 24px; }
-    #passwordModal.show { display: flex; }
-    #passwordModal .box { background: #2a2a3a; border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.9); }
-    #passwordModal .box h3 { margin: 0 0 8px; font-size: 16px; color: #fff; text-align: center; }
-    #passwordModal .box p { margin: 0 0 12px; font-size: 13px; color: #aaa; line-height: 1.4; text-align: center; }
-    #passwordModal .box input { width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #4a4a7a; background: #1b1b28; color: #fff; margin-bottom: 12px; outline: none; }
-    #passwordModal .box input:focus { border-color: #4a80d0; }
-    #passwordModal .box .actions { display: flex; gap: 8px; }
-    #passwordModal .box button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor:pointer; }
-    #passwordModal .box button.primary { background: #4a80d0; color: #fff; }
-    #passwordModal .box button.cancel { background: #555; color: #eee; }
+    .hintItem .hv {
+      color: #fff;
+      font-weight: 700;
+      font-size: 12px;
+      text-align: right;
+      padding-left: 4px;
+    }
+
+    .hintSection {
+      grid-column: 1 / -1;
+      color: #9cf;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid #3a3a5a;
+    }
+
+    .hintSection:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    #modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 24px;
+    }
+
+    #modal.show {
+      display: flex;
+    }
+
+    #modal .box {
+      background: #2a2a3a;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    #modal .box p {
+      margin: 0 0 16px;
+      font-size: 15px;
+      line-height: 1.4;
+      color: #eee;
+    }
+
+    #modal .box .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    #modal .box button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #modal .box button.danger {
+      background: #c44;
+      color: #fff;
+    }
+
+    #modal .box button.safe {
+      background: #4a80d0;
+      color: #fff;
+    }
+
+    #modal .box button.cancel {
+      background: #555;
+      color: #eee;
+    }
+
+    #passwordModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 210;
+      padding: 24px;
+    }
+
+    #passwordModal.show {
+      display: flex;
+    }
+
+    #passwordModal .box {
+      background: #2a2a3a;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    #passwordModal .box h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      color: #fff;
+      text-align: center;
+    }
+
+    #passwordModal .box p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    #passwordModal .box input {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: 1px solid #4a4a7a;
+      background: #1b1b28;
+      color: #fff;
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    #passwordModal .box input:focus {
+      border-color: #4a80d0;
+    }
+
+    #passwordModal .box .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    #passwordModal .box button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #passwordModal .box button.primary {
+      background: #4a80d0;
+      color: #fff;
+    }
+
+    #passwordModal .box button.cancel {
+      background: #555;
+      color: #eee;
+    }
 
     @media (max-width: 700px) {
-      #lobby, #rules, #modeSelect { padding: 12px; }
-      .card { padding: 14px; }
-      .card h2 { font-size: 16px; }
+
+      #lobby,
+      #rules,
+      #modeSelect {
+        padding: 12px;
+      }
+
+      .card {
+        padding: 14px;
+      }
+
+      .card h2 {
+        font-size: 16px;
+      }
     }
 
     @media (min-width: 900px) {
-      #gameScreen { flex-direction: row; }
+      #gameScreen {
+        flex-direction: row;
+      }
+
       #sidePanel {
         width: 360px;
         flex-shrink: 0;
@@ -172,50 +656,145 @@
         display: flex;
         flex-direction: column;
       }
-      #boardArea { flex: 1; min-width: 0; }
 
-      #topPanel { padding: 10px 12px; gap: 8px; }
-      #turnDot { width: 16px; height: 16px; }
-      #turnInfo { font-size: 14px; }
-      #mySideInfo { font-size: 12px; padding-left: 24px; }
-      #topPanel button { padding: 8px 12px; font-size: 13px; min-height: 36px; border-radius: 7px; }
-      #infoBtn { width: 36px; height: 36px; font-size: 15px; }
+      #boardArea {
+        flex: 1;
+        min-width: 0;
+      }
 
-      #controlPanel { padding: 10px; gap: 6px; }
-      #controlPanel .row { gap: 6px; }
-      #controlPanel button { padding: 12px 8px; font-size: 14px; min-height: 44px; border-radius: 8px; }
-      #controlPanel button.arrowBtn { padding: 8px; font-size: 20px; min-width: 44px; flex: 0 0 calc(25% - 6px); }
+      #topPanel {
+        padding: 10px 12px;
+        gap: 8px;
+      }
 
-      #boardWrap { padding: 12px; }
-      #boardWrap.waiting { padding-top: 28px; }
+      #turnDot {
+        width: 16px;
+        height: 16px;
+      }
 
-      #hintPopup { left: 360px; max-height: 340px; }
-      #hintHeaderText { font-size: 16px; }
-      .hintItem .hk, .hintItem .hv { font-size: 13px; }
+      #turnInfo {
+        font-size: 14px;
+      }
 
-      #bottomBar { padding: 6px 12px; min-height: 36px; }
-      #toast { font-size: 13px; padding: 8px 14px; }
+      #mySideInfo {
+        font-size: 12px;
+        padding-left: 24px;
+      }
+
+      #topPanel button {
+        padding: 8px 12px;
+        font-size: 13px;
+        min-height: 36px;
+        border-radius: 7px;
+      }
+
+      #infoBtn {
+        width: 36px;
+        height: 36px;
+        font-size: 15px;
+      }
+
+      #controlPanel {
+        padding: 10px;
+        gap: 6px;
+      }
+
+      #controlPanel .row {
+        gap: 6px;
+      }
+
+      #controlPanel button {
+        padding: 12px 8px;
+        font-size: 14px;
+        min-height: 44px;
+        border-radius: 8px;
+      }
+
+      #controlPanel button.arrowBtn {
+        padding: 8px;
+        font-size: 20px;
+        min-width: 44px;
+        flex: 0 0 calc(25% - 6px);
+      }
+
+      #boardWrap {
+        padding: 12px;
+      }
+
+      #boardWrap.waiting {
+        padding-top: 28px;
+      }
+
+      #hintPopup {
+        left: 360px;
+        max-height: 340px;
+      }
+
+      #hintHeaderText {
+        font-size: 16px;
+      }
+
+      .hintItem .hk,
+      .hintItem .hv {
+        font-size: 13px;
+      }
+
+      #bottomBar {
+        padding: 6px 12px;
+        min-height: 36px;
+      }
+
+      #toast {
+        font-size: 13px;
+        padding: 8px 14px;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <!-- ЛОББИ -->
   <div id="lobby" class="screen">
     <h1>⚔️ War Game</h1>
-    <div class="card" onclick="showModeSelect()"><h2>🆕 Создать новую партию</h2><p>Выберите режим боя</p></div>
-    <div class="resume" onclick="askResume()"><h2>🔄 Продолжить старую партию</h2><p>Введите свой пароль, чтобы вернуться в бой</p></div>
-    <div class="card" onclick="showRules()"><h2>📖 Правила</h2><p>Как играть, режимы, управление</p></div>
+    <div class="card" onclick="showModeSelect()">
+      <h2>🆕 Создать новую партию</h2>
+      <p>Выберите режим боя</p>
+    </div>
+    <div class="resume" onclick="askResume()">
+      <h2>🔄 Продолжить старую партию</h2>
+      <p>Введите свой пароль, чтобы вернуться в бой</p>
+    </div>
+    <div class="card" onclick="showRules()">
+      <h2>📖 Правила</h2>
+      <p>Как играть, режимы, управление</p>
+    </div>
   </div>
 
   <!-- ВЫБОР РЕЖИМА -->
   <div id="modeSelect" class="screen hidden">
     <h1>Выбор режима</h1>
-    <div class="card" onclick="showScreen('lobby')"><h2>← Назад</h2></div>
-    <div class="card" onclick="askCreate('10v20')"><h2>⚔️ Оборона: 10 vs 20</h2><p>Защитник: 10 пехоты + 2 пушки, видит всю карту. Атакующий: 20 пехоты + 3 пушки, ходит первым, 25 ходов. Горизонтальная река.</p></div>
-    <div class="card" onclick="askCreate('15v15')"><h2>⚔️ Равный бой: 15 vs 15</h2><p>По 13 пехоты + 3 пушки. У обоих туман. Ничья — 100 ходов.</p></div>
-    <div class="card" onclick="askCreate('capture')"><h2>🚩 Захват территории</h2><p>15×15. По 15 ходов на сторону. Побеждает тот, у кого больше контроля. По 13 пехоты + 3 пушки.</p></div>
-    <div class="card" onclick="askCreate('ffa4')"><h2>👥 Битва четырёх</h2><p>18×18, без реки. 4 армии по углам: 8 пехоты + 2 пушки. За каждого убитого врага-пехотинца — новый пехотинец на базе. Пароль обязателен.</p></div>
+    <div class="card" onclick="showScreen('lobby')">
+      <h2>← Назад</h2>
+    </div>
+    <div class="card" onclick="askCreate('10v20')">
+      <h2>⚔️ Оборона: 10 vs 20</h2>
+      <p>Защитник: 10 пехоты + 2 пушки, видит всю карту. Атакующий: 20 пехоты + 3 пушки, ходит первым, 25 ходов.
+        Горизонтальная река.</p>
+    </div>
+    <div class="card" onclick="askCreate('15v15')">
+      <h2>⚔️ Равный бой: 15 vs 15</h2>
+      <p>По 13 пехоты + 3 пушки. У обоих туман. Ничья — 100 ходов.</p>
+    </div>
+    <div class="card" onclick="askCreate('capture')">
+      <h2>🚩 Захват территории</h2>
+      <p>15×15. По 15 ходов на сторону. Побеждает тот, у кого больше контроля. По 13 пехоты + 3 пушки.</p>
+    </div>
+    <div class="card" onclick="askCreate('ffa4')">
+      <h2>👥 Битва четырёх</h2>
+      <p>18×18, без реки. 4 армии по углам: 8 пехоты + 2 пушки. За каждого убитого врага-пехотинца — новый пехотинец на
+        базе. Пароль обязателен.</p>
+    </div>
   </div>
 
   <!-- ПРАВИЛА -->
@@ -225,21 +804,24 @@
 
     <div class="rules-section">
       <h2>🎯 Суть игры</h2>
-      <p>Пошаговая тактическая игра. Цель — уничтожить всех бойцов противника (в «Захвате» — захватить больше территории, в «Битве четырёх» — остаться последним).</p>
+      <p>Пошаговая тактическая игра. Цель — уничтожить всех бойцов противника (в «Захвате» — захватить больше
+        территории, в «Битве четырёх» — остаться последним).</p>
       <p>Туман войны, ландшафт, вероятность попадания, пушки.</p>
     </div>
 
     <div class="rules-section">
       <h2>⚔️ Режимы</h2>
       <h3>10 vs 20 (оборона)</h3>
-      <p>Защитник — 10 пехоты + 2 пушки, видит всю карту, расставляет вручную. Атакующий — 20 пехоты + 3 пушки, авто снизу, ходит первым.</p>
+      <p>Защитник — 10 пехоты + 2 пушки, видит всю карту, расставляет вручную. Атакующий — 20 пехоты + 3 пушки, авто
+        снизу, ходит первым.</p>
       <p><b>У атакующего 25 ходов.</b> Не успел уничтожить защитника — проиграл.</p>
       <h3>15 vs 15</h3>
       <p>По 13 пехоты + 3 пушки. У обоих туман. 100 ходов — ничья. Можно предложить ничью вручную.</p>
       <h3>Захват территории</h3>
       <p>По 15 ходов на сторону (всего 30). По 13 пехоты + 3 пушки. Побеждает тот, у кого больше контроля.</p>
       <h3>Битва четырёх</h3>
-      <p>18×18, без реки. Четыре армии по 8 пехоты + 2 пушки начинают по углам. За каждого убитого врага-пехотинца у убийцы на базе появляется новый пехотинец. Победа — остаться последним. Пароль обязателен.</p>
+      <p>18×18, без реки. Четыре армии по 8 пехоты + 2 пушки начинают по углам. За каждого убитого врага-пехотинца у
+        убийцы на базе появляется новый пехотинец. Победа — остаться последним. Пароль обязателен.</p>
     </div>
 
     <div class="rules-section">
@@ -255,7 +837,8 @@
       <h2>👁 Обзор и стрельба</h2>
       <p>По 3 линиям (главная + 2 параллельные).</p>
       <p>Обзор: 9 (с холма 12). Стрельба пехоты: 6 (с холма 8).</p>
-      <p><b>Река не мешает стрельбе.</b> Лес и холм — препятствия: в них можно попасть, но через них линия не идёт. С холма можно стрелять сквозь лес, но не сквозь другой холм.</p>
+      <p><b>Река не мешает стрельбе.</b> Лес и холм — препятствия: в них можно попасть, но через них линия не идёт. С
+        холма можно стрелять сквозь лес, но не сквозь другой холм.</p>
       <p><b>Холм:</b> +2 стрельба, +3 обзор, +15%.</p>
     </div>
 
@@ -283,7 +866,8 @@
 
     <div class="rules-section">
       <h2>💾 Партии</h2>
-      <p>При создании игры можно ввести пароль. Если все игроки ввели пароли — партия сохраняется, можно вернуться через «Продолжить старую партию». В «Битве четырёх» пароль обязателен.</p>
+      <p>При создании игры можно ввести пароль. Если все игроки ввели пароли — партия сохраняется, можно вернуться через
+        «Продолжить старую партию». В «Битве четырёх» пароль обязателен.</p>
     </div>
   </div>
 
@@ -291,7 +875,8 @@
   <div id="waitingScreen" class="screen hidden">
     <h1>🔍 Поиск соперников...</h1>
     <p style="text-align:center;color:#aaa">Ждём, пока подберутся игроки</p>
-    <button onclick="cancelQueue()" style="margin-top:20px;padding:12px 24px;border-radius:8px;border:none;background:#4a80d0;color:#fff;font-size:16px;cursor:pointer;">Отменить</button>
+    <button onclick="cancelQueue()"
+      style="margin-top:20px;padding:12px 24px;border-radius:8px;border:none;background:#4a80d0;color:#fff;font-size:16px;cursor:pointer;">Отменить</button>
   </div>
 
   <!-- ИГРА -->
@@ -331,7 +916,12 @@
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО -->
-  <div id="modal"><div class="box"><p id="modalText"></p><div class="actions" id="modalActions"></div></div></div>
+  <div id="modal">
+    <div class="box">
+      <p id="modalText"></p>
+      <div class="actions" id="modalActions"></div>
+    </div>
+  </div>
 
   <!-- МОДАЛЬНОЕ ОКНО ПАРОЛЯ -->
   <div id="passwordModal">
@@ -397,7 +987,7 @@
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         if (window.Telegram.WebApp.disableVerticalSwipes) window.Telegram.WebApp.disableVerticalSwipes();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function roleColor(role) { return ROLE_COLORS[role] || '#888'; }
@@ -536,66 +1126,65 @@
       if (!state) return;
       requestAnimationFrame(() => {
         resizeCanvas();
-        render ();
-        if (document.getElementById('hintPopup').class     List.contains('show')) {
-          update ifHintContent();
-        }
-      });
-
-      // Анимация вы (!стрела (без тостов про попадания)
-      ifstate (state.lastEvent && state.lastEvent.kind) === 'shot' && state.lastEvent return.at !== lastShotEventAt) {
-        lastShotEventAt = state.lastEvent.at;
-        const e = state.lastEvent;
-        const fromCell = state.map[e.from.y] && state.map[e.from.y][e.from.x];
-        const fromVisible = fromCell && fromCell.terrain !== 'unknown';
-        const toCell = state.map[e.to.y] && state.map[e.to.y][e.to.x];
-        const toVisible = toCell && toCell.terrain !== 'unknown';
-        if (fromVisible || toVisible) {
-          const isCannon = !!e.cannon;
-          const dur = isCannon ? CANNON_ANIM_MS : SHOT_ANIM_MS;
-          bulletAnim = {
-            fx: fromVisible ? e.from.x : e.to.x,
-            fy: fromVisible ? e.from.y : e.to.y,
-            tx: e.to.x, ty: e.to.y,
-            start: performance.now(), dur, isCannon, onlyTarget: !fromVisible
-          };
-          animateBullet();
-        }
-        if (e.cannon && e.explosion && toVisible) {
-          explosionAnim = {
-            x: e.explosion.x, y: e.explosion.y, cells: e.explosion.cells,
-            start: performance.now() + CANNON_ANIM_MS, dur: EXPLOSION_ANIM_MS
-          };
-          setTimeout(() => animateExplosion(), CANNON_ANIM_MS);
-        }
+        render();
+        if (document.getElementById('hintPopup').classList.contains('show')) { updateifHintContent();
       }
+    });
 
-      // Модалка конца партии
-      if (state.phase === 'over' && state.lastEvent && state.lastEvent.kind === 'gameEnded' && state.lastEvent.at !== lastGameEndAt) {
-        lastGameEndAt = state.lastEvent.at;
-        showGameOverModal();
+    // Анимация вы (!стрела (без тостов про попадания)
+    if (state.lastEvent && state.lastEvent.kind === 'shot' && state.lastEvent.at !== lastShotEventAt) {
+      lastShotEventAt = state.lastEvent.at;
+      const e = state.lastEvent;
+      const fromCell = state.map[e.from.y] && state.map[e.from.y][e.from.x];
+      const fromVisible = fromCell && fromCell.terrain !== 'unknown';
+      const toCell = state.map[e.to.y] && state.map[e.to.y][e.to.x];
+      const toVisible = toCell && toCell.terrain !== 'unknown';
+      if (fromVisible || toVisible) {
+        const isCannon = !!e.cannon;
+        const dur = isCannon ? CANNON_ANIM_MS : SHOT_ANIM_MS;
+        bulletAnim = {
+          fx: fromVisible ? e.from.x : e.to.x,
+          fy: fromVisible ? e.from.y : e.to.y,
+          tx: e.to.x, ty: e.to.y,
+          start: performance.now(), dur, isCannon, onlyTarget: !fromVisible
+        };
+        animateBullet();
+      }
+      if (e.cannon && e.explosion && toVisible) {
+        explosionAnim = {
+          x: e.explosion.x, y: e.explosion.y, cells: e.explosion.cells,
+          start: performance.now() + CANNON_ANIM_MS, dur: EXPLOSION_ANIM_MS
+        };
+        setTimeout(() => animateExplosion(), CANNON_ANIM_MS);
       }
     }
 
-    function showGameOverModal();
-      let title;
-      if (state.draw) title = '🤝 Ничья';
-      else if (state.winner === myRole) title = '🏆 Победа!';
-      else title = '💀 Поражение';
+    // Модалка конца партии
+    if (state.phase === 'over' && state.lastEvent && state.lastEvent.kind === 'gameEnded' && state.lastEvent.at !== lastGameEndAt) {
+      lastGameEndAt = state.lastEvent.at;
+      showGameOverModal();
+    }
+    }
 
-      let reason = '';
-      switch (state.endReason) {
-        case 'attackerTimeout': reason = 'Атакующий не успел за 25 ходов — защитник победил.'; break;
-        case 'turnLimit': reason = state.draw ? 'Ходы закончились. Контроль равный — ничья.' : 'Ходы закончились. Победа по контролю территории.'; break;
-        case 'drawLimit': reason = 'Достигнут лимит ходов — ничья.'; break;
-        case 'agreement': reason = 'Все живые игроки согласились на ничью.'; break;
-        case 'destroyed': reason = 'Армия противника полностью уничтожена.'; break;
-        case 'lastStanding': reason = 'Вы — последний выживший на поле.'; break;
-        case 'allDead': reason = 'Все армии уничтожены одновременно.'; break;
-      }
-      showModal(title + (reason ? '\n' + reason : ''), [
-        { text: 'В лобби', cls: 'safe', action: () => { hideModal(); leaveToLobby(); } }
-      ]);
+    function showGameOverModal() {
+    let title;
+    if (state.draw) title = '🤝 Ничья';
+    else if (state.winner === myRole) title = '🏆 Победа!';
+    else title = '💀 Поражение';
+
+    let reason = '';
+    switch (state.endReason) {
+      case 'attackerTimeout': reason = 'Атакующий не успел за 25 ходов — защитник победил.'; break;
+      case 'turnLimit': reason = state.draw ? 'Ходы закончились. Контроль равный — ничья.' : 'Ходы закончились. Победа по контролю территории.'; break;
+      case 'drawLimit': reason = 'Достигнут лимит ходов — ничья.'; break;
+      case 'agreement': reason = 'Все живые игроки согласились на ничью.'; break;
+      case 'destroyed': reason = 'Армия противника полностью уничтожена.'; break;
+      case 'lastStanding': reason = 'Вы — последний выживший на поле.'; break;
+      case 'allDead': reason = 'Все армии уничтожены одновременно.'; break;
+    }
+    showModal(title + (reason ? '\n' + reason : ''), [
+      { text: 'В лобби', cls: 'safe', action: () => { hideModal(); leaveToLobby(); } }
+    ]);
     }
 
     function resizeCanvas() {
@@ -733,7 +1322,7 @@
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
       grad.addColorStop(0, `rgba(255,220,80,${0.9 * (1 - t)})`);
       grad.addColorStop(0.5, `rgba(255,120,30,${0.7 * (1 - t)})`);
-      grad.addColorStop(1,'rgba(120,30,0,0)');
+      grad.addColorStop(1, 'rgba(120,30,0,0)');
       ctx.fillStyle = grad;
       ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
     }
@@ -803,7 +1392,7 @@
       } else if (hp === 1) {
         ctx.beginPath(); ctx.arc(px, py + dy, dotR, 0, Math.PI * 2); ctx.fill();
       }
-      const v = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]][dir];
+      const v = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]][dir];
       ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(px + v[0] * CELL * 0.22, py + v[1] * CELL * 0.22);
@@ -873,7 +1462,7 @@
     function getMoveCells(u) {
       const N = state.size;
       const maxSteps = u.type === 'cannon' ? 1 : 2;
-      const dirs = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+      const dirs = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
       const out = [];
       for (const [dx, dy] of dirs) {
         for (let s = 1; s <= maxSteps; s++) {
@@ -908,7 +1497,7 @@
         }
       }
     }
-function updateTopPanel() {
+    function updateTopPanel() {
       const dot = document.getElementById('turnDot');
       const info = document.getElementById('turnInfo');
       const sideInfo = document.getElementById('mySideInfo');
@@ -1031,8 +1620,8 @@ function updateTopPanel() {
         shootBtn.style.flex = '1 1 100%';
         rowMain.appendChild(shootBtn);
 
-        ['↖','↑','↗','→','↘','↓','↙','←'].forEach(s => {
-          const mapD = { '↑':0, '↗':1, '→':2, '↘':3, '↓':4, '↙':5, '←':6, '↖':7 };
+        ['↖', '↑', '↗', '→', '↘', '↓', '↙', '←'].forEach(s => {
+          const mapD = { '↑': 0, '↗': 1, '→': 2, '↘': 3, '↓': 4, '↙': 5, '←': 6, '↖': 7 };
           mkBtn(rowArrows, s, () => rotateSelected(mapD[s]), 'arrowBtn');
         });
 
@@ -1066,10 +1655,12 @@ function updateTopPanel() {
             }
             if (state.drawProposed) return;
             showModal('Предложить ничью?', [
-              { text: 'Предложить', cls: 'safe', action: () => {
-                hideModal();
-                ws.send(JSON.stringify({ type: 'proposeDraw' }));
-              }},
+              {
+                text: 'Предложить', cls: 'safe', action: () => {
+                  hideModal();
+                  ws.send(JSON.stringify({ type: 'proposeDraw' }));
+                }
+              },
               { text: 'Отмена', cls: 'cancel', action: hideModal }
             ]);
           });
@@ -1476,15 +2067,17 @@ function updateTopPanel() {
 
     function askSurrender() {
       showModal('Точно сдаться? Ваша армия исчезнет, партия продолжится без вас.', [
-        { text: 'Сдаться', cls: 'danger', action: () => {
-          hideModal();
-          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'surrender' }));
-          state = null; selected.clear(); aimMode = false;
-          confirmEndArmed = false; setupUnits = [];
-          hideHint();
-          hideModal();
-          showScreen('lobby');
-        }},
+        {
+          text: 'Сдаться', cls: 'danger', action: () => {
+            hideModal();
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'surrender' }));
+            state = null; selected.clear(); aimMode = false;
+            confirmEndArmed = false; setupUnits = [];
+            hideHint();
+            hideModal();
+            showScreen('lobby');
+          }
+        },
         { text: 'Продолжить', cls: 'safe', action: hideModal }
       ]);
     }
@@ -1551,5 +2144,5 @@ function updateTopPanel() {
     }
   </script>
 </body>
+
 </html>
-	
