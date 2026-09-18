@@ -14,10 +14,14 @@
     .hidden { display: none !important; }
 
     #lobby h1, #modeSelect h1, #rules h1 { text-align: center; font-size: 26px; margin: 18px 0; }
-    .card { background: #26263a; border-radius: 12px; padding: 18px; margin-bottom: 12px; cursor: pointer; min-height: 60px; }
+    .card { background: #26263a; border-radius: 12px; padding: 22px 20px; margin-bottom: 14px; cursor: pointer; min-height: 72px; }
     .card:active { background: #3a3a55; }
-    .card h2 { margin: 0 0 6px; font-size: 18px; }
-    .card p { margin: 0; color: #aaa; font-size: 14px; line-height: 1.4; }
+    .card h2 { margin: 0 0 8px; font-size: 21px; }
+    .card p { margin: 0; color: #aaa; font-size: 15px; line-height: 1.45; }
+    .card.primary { background: #4a80d0; }
+    .card.primary:active { background: #5a90e0; }
+    .card.primary h2 { color: #fff; }
+    .card.primary p { color: #dde8f5; }
 
     .rules-section { background: #26263a; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
     .rules-section h2 { margin: 0 0 10px; font-size: 18px; color: #6cf; }
@@ -116,19 +120,19 @@
       font-weight: bold;
     }
     #hintCloseBtn:active { background: #4a4a7a; }
-    /* Компактная сетка: подпись и число рядом */
+    /* Компактная сетка в 2 пары «подпись-число» на строку */
     #hintGrid {
       display: grid;
-      grid-template-columns: max-content max-content;
-      gap: 4px 8px;
+      grid-template-columns: max-content 1fr max-content 1fr;
+      gap: 4px 14px;
       align-items: center;
-      justify-content: start;
     }
     .hintItem { display: contents; }
-    .hintItem .hk { color: #bbb; font-size: 12px; }
-    .hintItem .hv { color: #fff; font-weight: 700; font-size: 12px; text-align: left; }
+    .hintItem .hk { color: #bbb; font-size: 12px; white-space: nowrap; }
+    .hintItem .hv { color: #fff; font-weight: 700; font-size: 12px; text-align: left; padding-right: 8px; }
     .hintSection { grid-column: 1 / -1; color: #9cf; font-size: 11px; font-weight: 600; margin-top: 6px; padding-top: 6px; border-top: 1px solid #3a3a5a; }
     .hintSection:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    .hintNote { grid-column: 1 / -1; color: #999; font-size: 10px; line-height: 1.4; padding: 2px 0 4px 0; }
 
     #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.78); display: none; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
     #modal.show { display: flex; }
@@ -154,8 +158,8 @@
 
     @media (max-width: 700px) {
       #lobby, #rules, #modeSelect { padding: 12px; }
-      .card { padding: 14px; }
-      .card h2 { font-size: 16px; }
+      .card { padding: 18px 16px; }
+      .card h2 { font-size: 19px; }
     }
 
     @media (min-width: 900px) {
@@ -200,7 +204,7 @@
   <!-- ЛОББИ -->
   <div id="lobby" class="screen">
     <h1>⚔️ War Game</h1>
-    <div class="card" onclick="showModeSelect()"><h2>🆕 Создать новую партию</h2><p>Выберите режим боя</p></div>
+    <div class="card primary" onclick="showModeSelect()"><h2>🆕 Создать новую партию</h2><p>Выберите режим боя</p></div>
     <div class="card" onclick="askResume()"><h2>🔄 Продолжить старую партию</h2><p>Введите свой пароль, чтобы вернуться в бой</p></div>
     <div class="card" onclick="showRules()"><h2>📖 Правила</h2><p>Как играть, режимы, управление</p></div>
   </div>
@@ -211,7 +215,7 @@
     <div class="card" onclick="showScreen('lobby')"><h2>← Назад</h2></div>
     <div class="card" onclick="askCreate('10v20')"><h2>⚔️ Оборона: 10 vs 20</h2><p>Защитник: 10 пехоты + 2 пушки, видит всю карту. Атакующий: 20 пехоты + 3 пушки, ходит первым, 25 ходов. Горизонтальная река.</p></div>
     <div class="card" onclick="askCreate('15v15')"><h2>⚔️ Равный бой: 15 vs 15</h2><p>По 13 пехоты + 3 пушки. У обоих туман. Ничья — 100 ходов.</p></div>
-    <div class="card" onclick="askCreate('capture')"><h2>🚩 Захват территории</h2><p>15×15. По 15 ходов на сторону. Побеждает тот, у кого больше контроля. По 13 пехоты + 3 пушки.</p></div>
+    <div class="card" onclick="askCreate('capture')"><h2>🚩 Захват территории</h2><p>15×15. По 10 ходов на сторону. Побеждает тот, у кого больше контроля. По 13 пехоты + 3 пушки.</p></div>
     <div class="card" onclick="askCreate('ffa4')"><h2>👥 Битва четырёх</h2><p>18×18, без реки. 4 армии по углам: 8 пехоты + 2 пушки. За каждого убитого врага-пехотинца — новый пехотинец на базе. Пароль обязателен.</p></div>
   </div>
 
@@ -234,7 +238,7 @@
       <h3>15 vs 15</h3>
       <p>По 13 пехоты + 3 пушки. У обоих туман. 100 ходов — ничья. Можно предложить ничью вручную.</p>
       <h3>Захват территории</h3>
-      <p>По 15 ходов на сторону (всего 30). По 13 пехоты + 3 пушки. Побеждает тот, у кого больше контроля.</p>
+      <p>По 10 ходов на сторону (всего 20). По 13 пехоты + 3 пушки. Побеждает тот, у кого больше контроля.</p>
       <h3>Битва четырёх</h3>
       <p>18×18, без реки. Четыре армии по 8 пехоты + 2 пушки начинают по углам. За каждого убитого врага-пехотинца у убийцы на базе появляется новый пехотинец. Победа — остаться последним. Пароль обязателен.</p>
     </div>
@@ -359,7 +363,6 @@
       player3: 'Игрок 3',
       player4: 'Игрок 4'
     };
-    // Цвета для режима «Битва четырёх» (у каждого свой)
     const FFA_COLORS = {
       player1: '#4a80d0',
       player2: '#c44',
@@ -401,9 +404,23 @@
 
     function roleName(role) { return ROLE_NAMES[role] || role; }
 
-    // Цвет юнита/стороны для отображения.
-    // ffa4 — у каждой роли свой цвет.
-    // Остальные режимы — «я всегда синий, враг всегда красный».
+    // Человеческое название стороны: Вы / Противник / Игрок N
+    function whoName(role) {
+      if (!state) return roleName(role);
+      if (state.mode === 'ffa4') return roleName(role);
+      if (role === myRole) {
+        if (state.mode === '10v20') return 'Вы (' + roleName(myRole) + ')';
+        return 'Вы';
+      }
+      if (state.mode === '10v20') return 'Противник (' + roleName(role) + ')';
+      return 'Противник';
+    }
+    function whoNameSafe(role) {
+      if (!state) return roleName(role);
+      return whoName(role);
+    }
+
+    // Цвет юнита/стороны. ffa4 — индивидуальный, остальные — я синий/враг красный.
     function unitColor(owner) {
       if (state && state.mode === 'ffa4') return FFA_COLORS[owner] || '#888';
       return owner === myRole ? MY_COLOR : ENEMY_COLOR;
@@ -429,8 +446,9 @@
       openPasswordModal(
         isFFA ? 'Пароль обязателен' : 'Создать партию',
         isFFA
-          ? 'Для «Битвы четырёх» пароль обязателен. Запомните его — по нему вы вернётесь в партию.'
-          : 'Введите пароль (необязательно). Если все игроки введут пароли, партия сохранится.',
+          ? 'Придумайте и введите пароль для этой партии. Для «Битвы четырёх» пароль обязателен — по нему вы вернётесь в партию.'
+          : 'Придумайте и введите пароль для этой партии. Если оба игрока введут пароль, партия сохранится — по нему вы сможете вернуться.',
+        isFFA ? 'Придумайте и введите пароль' : 'Придумайте и введите пароль (необязательно)',
         (password) => {
           if (isFFA && !password) {
             showToast('Нужен пароль', 'error');
@@ -451,7 +469,8 @@
     function askResume() {
       openPasswordModal(
         'Продолжить партию',
-        'Введите свой пароль — вы вернётесь в свою сторону партии.',
+        'Введите пароль, чтобы зайти в нужную вам партию.',
+        'Введите пароль',
         (password) => {
           ensureWS();
           ws._pendingCreate = null;
@@ -490,7 +509,7 @@
       };
       ws.onmessage = (ev) => {
         let msg;
-        try { msg = JSON.parse(ev.data); } catch { return; }
+        try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (msg.type === 'matched') {
           myRole = msg.role;
           setupUnits = [];
@@ -509,12 +528,12 @@
         } else if (msg.type === 'warnPassword') {
           showToast('Кто-то не ввёл пароль — партия не сохранится', 'warn');
         } else if (msg.type === 'playerLeft') {
-          showToast(roleName(msg.role) + ' вышел из партии', 'warn');
+          showToast(whoNameSafe(msg.role) + ' вышел из партии', 'warn');
         } else if (msg.type === 'playerSurrendered') {
-          showToast(roleName(msg.role) + ' сдался и покинул бой', 'warn');
+          showToast(whoNameSafe(msg.role) + ' сдался и покинул бой', 'warn');
         } else if (msg.type === 'playerDefeated') {
           if (msg.role === myRole) showToast('Ваша армия полностью побеждена', 'error');
-          else showToast(roleName(msg.role) + ' полностью побеждён', 'info');
+          else showToast(whoNameSafe(msg.role) + ' полностью побеждён', 'info');
         } else if (msg.type === 'error') {
           showToast(msg.message, 'error');
           if (state === null && !document.getElementById('waitingScreen').classList.contains('hidden')) {
@@ -633,8 +652,7 @@
       MAP = state.map;
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) drawTerrain(x, y, MAP[y][x]);
 
-      // Захват территории: подсвечиваем ТОЛЬКО свои клетки.
-      // Клетки врага не показываем — иначе видно позиции его юнитов.
+      // Захват: подсвечиваем ТОЛЬКО свои клетки, клетки врага не показываем.
       if (state.mode === 'capture' && state.territory) {
         const cells = state.territory.myCells || [];
         ctx.fillStyle = 'rgba(255,200,60,0.28)';
@@ -914,7 +932,6 @@
         }
       }
     }
-
 function updateTopPanel() {
       const dot = document.getElementById('turnDot');
       const info = document.getElementById('turnInfo');
@@ -931,7 +948,6 @@ function updateTopPanel() {
 
       if (state.phase === 'battle') {
         const myTurn = state.turn === myRole;
-        // Цвет точки: в ffa4 — цвет роли хода, иначе — синий если мой ход, красный если чужой
         let tc;
         if (state.mode === 'ffa4') tc = FFA_COLORS[state.turn] || '#888';
         else tc = myTurn ? MY_COLOR : ENEMY_COLOR;
@@ -942,9 +958,7 @@ function updateTopPanel() {
           info.textContent = 'Ваш ход';
         } else {
           const disconnected = (state.disconnectedRoles || []).indexOf(state.turn) !== -1;
-          info.textContent = disconnected
-            ? 'Ход ' + roleName(state.turn) + ' (отключён)'
-            : 'Ход: ' + roleName(state.turn);
+          info.textContent = 'Ход: ' + whoName(state.turn) + (disconnected ? ' (отключён)' : '');
         }
       } else if (state.phase === 'setup') {
         dot.style.background = MY_COLOR;
@@ -956,7 +970,9 @@ function updateTopPanel() {
           dot.style.boxShadow = '0 0 8px #888';
           info.textContent = '🤝 Ничья';
         } else {
-          const wc = state.mode === 'ffa4' ? (FFA_COLORS[state.winner] || '#888') : (state.winner === myRole ? MY_COLOR : ENEMY_COLOR);
+          let wc;
+          if (state.mode === 'ffa4') wc = FFA_COLORS[state.winner] || '#888';
+          else wc = state.winner === myRole ? MY_COLOR : ENEMY_COLOR;
           dot.style.background = wc;
           dot.style.boxShadow = '0 0 8px ' + wc;
           info.textContent = state.winner === myRole ? '🏆 Победа!' : '💀 Поражение';
@@ -1014,8 +1030,8 @@ function updateTopPanel() {
         if (!myTurn) {
           const disconnected = (state.disconnectedRoles || []).indexOf(state.turn) !== -1;
           const label = disconnected
-            ? '⏳ Ход ' + roleName(state.turn) + ' (игрок отключён)'
-            : '⏳ Ход ' + roleName(state.turn);
+            ? '⏳ Ход ' + whoName(state.turn) + ' (отключён)'
+            : '⏳ Ход: ' + whoName(state.turn);
           const b = mkBtn(rowMain, label, null, 'waitingBtn');
           b.style.flex = '1 1 100%';
           b.disabled = true;
@@ -1348,7 +1364,6 @@ function updateTopPanel() {
 
       const circle = document.getElementById('hintHeaderCircle');
       const text = document.getElementById('hintHeaderText');
-      // Цвет кружка в заголовке: в ffa4 — мой цвет; иначе — синий (я)
       if (state.mode === 'ffa4') circle.style.background = FFA_COLORS[myRole] || '#888';
       else circle.style.background = MY_COLOR;
       text.textContent = state.mode === '10v20'
@@ -1370,7 +1385,7 @@ function updateTopPanel() {
       if (state.roles && state.roles.length > 1) {
         items.push({ section: 'Стороны' });
         state.roles.forEach(r => {
-          items.push({ k: roleName(r), v: (unitCounts[r] != null ? unitCounts[r] : 0) });
+          items.push({ k: whoName(r), v: (unitCounts[r] != null ? unitCounts[r] : 0) });
         });
       }
 
@@ -1393,7 +1408,7 @@ function updateTopPanel() {
 
       if (state.mode === 'capture') {
         items.push({ section: 'Захват' });
-        const perSide = state.turnLimit || 15;
+        const perSide = state.turnLimit || 10;
         const total = perSide * 2;
         const tn = state.turnNumber || 0;
         items.push({ k: 'Ход', v: tn + ' / ' + total });
@@ -1402,6 +1417,7 @@ function updateTopPanel() {
           items.push({ k: 'Мой контроль', v: state.territory.me + '%' });
           items.push({ k: 'Контроль врага', v: state.territory.enemy + '%' });
         }
+        items.push({ note: 'Контроль = клетки под бойцами + зона их обстрела + тыл за ними. На карте показан только ваш контроль.' });
       }
 
       if (state.mode === 'ffa4') {
@@ -1415,7 +1431,7 @@ function updateTopPanel() {
       if (state.disconnectedRoles && state.disconnectedRoles.length > 0) {
         items.push({ section: 'Не в сети' });
         state.disconnectedRoles.forEach(r => {
-          items.push({ k: roleName(r), v: 'отключён' });
+          items.push({ k: whoName(r), v: 'отключён' });
         });
       }
 
@@ -1426,6 +1442,11 @@ function updateTopPanel() {
           const d = document.createElement('div');
           d.className = 'hintSection';
           d.textContent = it.section;
+          grid.appendChild(d);
+        } else if (it.note) {
+          const d = document.createElement('div');
+          d.className = 'hintNote';
+          d.textContent = it.note;
           grid.appendChild(d);
         } else {
           const d = document.createElement('div');
@@ -1506,12 +1527,13 @@ function updateTopPanel() {
       ]);
     }
 
-    function openPasswordModal(title, subtitle, onOk) {
+    function openPasswordModal(title, subtitle, placeholder, onOk) {
       const m = document.getElementById('passwordModal');
       document.getElementById('pwTitle').textContent = title;
       document.getElementById('pwSubtitle').textContent = subtitle;
       const input = document.getElementById('pwInput');
       input.value = '';
+      input.placeholder = placeholder || 'Введите пароль';
       passwordAction = onOk;
       m.classList.add('show');
       setTimeout(() => input.focus(), 100);
