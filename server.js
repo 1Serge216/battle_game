@@ -487,7 +487,7 @@ function publicState(room, role) {
     const cell = room.map[u.y][u.x];
     if (cell.terrain === 'forest') return false;
     return visible.has(u.y + ',' + u.x);
-  }))
+  })
         
         .map(u => ({
             id: u.id, owner: u.owner, x: u.x, y: u.y, dir: u.dir,
