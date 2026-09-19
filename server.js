@@ -482,12 +482,12 @@ function publicState(room, role) {
     }
 
     const units = room.units
-        .filter(u => {
-            if (u.owner === role) return true;
-            const cell = room.map[u.y][u.x];
-            if (cell.terrain === 'forest' && !seesAll) return false;
-            if (seesAll) return true;
-            return visible.has(u.y + ',' + u.x);
+  .filter(u => {
+    if (u.owner === role) return true;
+    const cell = room.map[u.y][u.x];
+    if (cell.terrain === 'forest') return false;
+    return visible.has(u.y + ',' + u.x);
+  })
         })
         .map(u => ({
             id: u.id, owner: u.owner, x: u.x, y: u.y, dir: u.dir,
